@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}{{ topic.title }} — topic-monitor{% endblock %}
+{% block content %}
+<h1>{{ topic.title }}</h1>
+<p class="muted">{{ topic.description }}</p>
+<p class="muted">{{ items|length }} accepted items &middot; cadence: {{ topic.cadence }}</p>
+
+{% for source_type, group in groups %}
+<h2>{{ source_type }} ({{ group|length }})</h2>
+<ul class="items">
+  {% for item in group %}
+  <li>
+    <a class="title" href="{{ item.url or item.pdf_url }}">{{ item.title }}</a>
+    {% if item.featured %}<span class="badge">featured</span>{% endif %}
+    <div class="meta">
+      {{ item.authors|join(', ') if item.authors else item.organisation }}
+      {% if item.venue %} &middot; {{ item.venue }}{% endif %}
+      {% if item.date %} &middot; {{ item.date }}{% endif %}
+    </div>
+  </li>
+  {% endfor %}
+</ul>
+{% endfor %}
+{% endblock %}

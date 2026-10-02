@@ -180,8 +180,81 @@ topic-monitor/
 
 ## Status
 
-Phase 0 (read and plan) in progress: repos read, patterns summarized above,
-repo skeleton created, decisions above confirmed with Kevin. Engine code
-(Phase 1: item schema, connector interface, OpenAlex + GDELT + outlet RSS +
-Google Alerts RSS, normalise/dedupe/score, review issue, basic site, source
-health) not yet written.
+Phase 0 done. Phase 1 (engine with scholarship and news) written and
+locally verified as far as this sandbox allows; needs a live GitHub
+Actions run (Python 3.12) to fully confirm GDELT/RSS/AI scoring before
+it's "done done." Specifics:
+
+**Built:** item schema (`engine/pipeline/items.py`), JSONL corpus +
+decisions store (`corpus.py`), connectors for OpenAlex / GDELT / generic
+RSS (`engine/connectors/`), dedupe with the work_key fix
+(`dedupe.py`), two-stage scoring — keyword gate always, Claude API batch
+call if `ANTHROPIC_API_KEY` is set (`score.py`), review-issue
+render/parse (`review.py`), health aggregation (`health.py`), Jinja2 site
+build (`build.py`), CLI (`harvest` / `publish` / `build`), the three
+GitHub Actions workflows, 17 unit tests (6 using fixtures recorded live on
+2026-10-02), the CBDC topic profile, and `registry/outlets.yaml` with 6
+live-tested outlets (7 more confirmed dead and kept on record, not
+deleted).
+
+**Verified locally with real data** (this sandbox only has Python 3.7, so
+`feedparser`/`anthropic` can't install — see below): ran the full harvest →
+dedupe → keyword-gate → review-issue-render → parse → decisions → corpus →
+health → site-build loop against live OpenAlex results for all 5 CBDC
+queries. 500 raw items → 396 after dedupe (104 exact+version duplicates
+collapsed, 0 residual duplicate groups in the final candidate set) → 232
+keyword-gate survivors (213 articles, 17 chapters, 1 report, 1 book). All
+three Phase 1 success criteria met on this slice:
+  - [x] CBDC topic produces a review issue with ≥30 relevant items (232 ≫ 30)
+  - [x] Duplicate rate in the review issue <5% (0% residual, confirmed by
+        re-running work_key clustering over the final candidate list)
+  - [ ] Every enabled source shows `ok` or a reasoned `broken` — true for
+        OpenAlex and the 6 RSS outlets (tested live via curl), **not yet
+        confirmed for GDELT** (see below) or AI scoring (no key set yet)
+This demo run's output was reset before committing — it used the
+pre-tick defaults as a stand-in for Kevin's real review, which isn't a
+real decision and shouldn't sit in the corpus as if it were one. The
+actual first run should happen for real via the harvest workflow once
+this is pushed, producing a real GitHub issue for Kevin to review by hand.
+
+**Not yet confirmed live:**
+  - GDELT: reachable (not blocked), but 429 rate-limited from this build
+    sandbox's egress IP on both attempts, each ~10s apart. The connector
+    implements the "one request at a time with backoff" lesson from
+    insubordinate-terminal's health.json, but needs a real run from the
+    GitHub Actions runner's IP (different network) to confirm it isn't
+    rate-limited there too.
+  - The RSS connector's `feedparser` parsing: code is written and
+    exercises real recorded fixtures in the test suite, but this sandbox's
+    Python (3.7) is too old to install `feedparser` or `anthropic`, so
+    `harvest_rss()` and `ai_score()` haven't executed end-to-end locally
+    — only unit-tested (the RSS test is `pytest.importorskip`-skipped
+    locally, not failing). Both need GitHub Actions' Python 3.12 to verify
+    for real.
+  - AI scoring: implemented and unit-tested for the "no key" path; the
+    real Claude API call path needs `ANTHROPIC_API_KEY` added as a repo
+    secret before it can run at all.
+
+**Not done, and intentionally deferred (see "What we're reusing" above):**
+  - Real embedding-similarity as scoring stage 1, per the build brief's
+    pipeline design — using the reference repos' proven keyword/term-gate
+    instead, since embeddings would mean picking and paying for a new
+    provider (Claude has none) that wasn't part of the API decision Kevin
+    already made. Revisit once there's enough accept/reject history to
+    tell whether the keyword gate's false-negative rate actually matters.
+  - The `new-topic` wizard, organisation registry, grey-lit/book
+    connectors, official-document scrapers — all Phase 2.
+
+## Next steps before Phase 1 is fully closed out
+
+1. Push this commit (same manual GitHub Desktop step as Phase 0 — no
+   stored git credential on this machine).
+2. In the repo's GitHub Settings, add: secret `ANTHROPIC_API_KEY`
+   (decided provider, not yet supplied), repo variable `CONTACT_EMAIL` =
+   kdonovan11@gmail.com, repo variable `TAGGER_MODEL` = claude-haiku-4-5
+   (or leave unset — the code defaults to it).
+3. Run the `Harvest` workflow by hand (workflow_dispatch) to get the real
+   first run — confirms GDELT/RSS/AI-scoring live, and opens the actual
+   first review issue on GitHub for Kevin to work through.
+4. Once that issue is closed, confirm `Publish review` and `Build and
+   deploy site` both fire correctly and the live Pages site looks right.

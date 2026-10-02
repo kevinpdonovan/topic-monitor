@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}topic-monitor{% endblock %}</title>
+  <link rel="stylesheet" href="{{ root }}static/style.css">
+</head>
+<body>
+  <div class="wrap">
+    <header class="site">
+      <a href="{{ root }}index.html">topic-monitor</a>
+      <nav class="topics">
+        {% for t in all_topics %}
+          <a href="{{ root }}{{ t.slug }}/index.html" class="{{ 'active' if t.slug == active_slug else '' }}">{{ t.title }}</a>
+        {% endfor %}
+        <a href="{{ root }}health.html" class="{{ 'active' if active_slug == 'health' else '' }}">Source health</a>
+      </nav>
+    </header>
+    {% block content %}{% endblock %}
+  </div>
+</body>
+</html>

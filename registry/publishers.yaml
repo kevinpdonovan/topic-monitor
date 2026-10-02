@@ -1,0 +1,43 @@
+# Academic/trade presses to watch for new and forthcoming books, named by
+# Kevin on 2026-10-02. No feed URLs yet — the publisher-feed connector is
+# Phase 2 work (see docs/build-brief.md), so there is nothing to test yet.
+# Ground rule 4 still applies once URLs are added here: nothing moves from
+# `status: untested` to live use without a real request confirming it works.
+
+publishers:
+  - id: duke-up
+    name: Duke University Press
+    status: untested
+  - id: chicago
+    name: University of Chicago Press
+    status: untested
+  - id: california
+    name: University of California Press
+    status: untested
+  - id: cambridge
+    name: Cambridge University Press
+    status: untested
+  - id: oxford
+    name: Oxford University Press
+    status: untested
+  - id: zed
+    name: Zed Books
+    status: untested
+  - id: verso
+    name: Verso Books
+    status: untested
+  - id: cornell
+    name: Cornell University Press
+    status: untested
+  - id: mit
+    name: MIT Press
+    status: untested
+  - id: yale
+    name: Yale University Press
+    status: untested
+  - id: minnesota
+    name: University of Minnesota Press
+    status: untested
+  - id: trade
+    name: "Trade (non-academic) books — no single press; needs a broader discovery method (e.g. Google Books by subject) rather than a per-publisher feed"
+    status: untested

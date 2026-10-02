@@ -1,0 +1,62 @@
+name: Harvest
+
+on:
+  schedule:
+    # Monthly, 1st at 05:17 UTC — matches the CBDC topic's cadence. Once a
+    # second topic needs a different cadence, this still runs fine: harvest
+    # itself unions every *active* topic's queries regardless of individual
+    # cadence, so the cheap fix is to run this more often (e.g. weekly) and
+    # let the review-issue step only open an issue for topics whose cadence
+    # says it's due — not yet needed with a single monthly topic.
+    - cron: "17 5 1 * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  harvest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: pip install -r requirements.txt
+
+      - name: Harvest
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          CONTACT_EMAIL: ${{ vars.CONTACT_EMAIL }}
+          TAGGER_MODEL: ${{ vars.TAGGER_MODEL }}
+          OPENALEX_API_KEY: ${{ secrets.OPENALEX_API_KEY }}
+        run: python -m engine harvest
+
+      - name: Commit harvested data
+        run: |
+          git config user.name "topic-monitor-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add data/ topics/*/review/
+          git diff --staged --quiet || git commit -m "Harvest $(date -u +%F)"
+          git push
+
+      - name: Open a review issue per topic
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh label create review --color FEF2C0 2>/dev/null || true
+          for review_file in topics/*/review/*.md; do
+            [ -e "$review_file" ] || continue
+            slug=$(echo "$review_file" | cut -d/ -f2)
+            title=$(yq -r '.title' "topics/$slug/profile.yaml" 2>/dev/null || echo "$slug")
+            run_label=$(basename "$review_file" .md)
+            gh label create "topic:$slug" --color 1D76DB 2>/dev/null || true
+            gh issue create \
+              --title "$title review — $run_label" \
+              --label review \
+              --label "topic:$slug" \
+              --body-file "$review_file"
+          done

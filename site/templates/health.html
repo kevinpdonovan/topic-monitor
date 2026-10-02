@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Source health — topic-monitor{% endblock %}
+{% block content %}
+<h1>Source health</h1>
+{% if health %}
+<p class="muted">Run {{ health.run }} at {{ health.run_at }} &middot; {{ health.stats.sources_ok }}/{{ health.stats.sources_total }} sources ok &middot; {{ health.stats.items_total }} items returned</p>
+<table>
+  <tr><th>Source</th><th>Status</th><th>Items</th><th>Fail streak</th><th>Note</th></tr>
+  {% for s in health.sources|sort(attribute='source') %}
+  <tr>
+    <td>{{ s.source }}</td>
+    <td class="{{ 'ok' if s.ok else 'fail' }}">{{ 'ok' if s.ok else 'failing' }}</td>
+    <td>{{ s.count }}</td>
+    <td>{{ s.fail_streak }}</td>
+    <td class="muted">{{ s.note }}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% else %}
+<p class="muted">No health data yet — run the harvest workflow.</p>
+{% endif %}
+{% endblock %}

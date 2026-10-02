@@ -1,0 +1,85 @@
+# Pilot topic. Hand-authored for Phase 1 — the new-topic wizard (Phase 2)
+# doesn't exist yet, so these keywords are my seed proposal, not a
+# wizard-expanded + Kevin-approved set. Treat as a draft to revisit once
+# the wizard can do proper term expansion and exclusion review.
+#
+# Deliberately kept distinct from eNaira Watch: this topic covers CBDCs
+# globally, not Nigeria specifically, to avoid duplicating that monitor.
+# eNaira/Nigeria material will still surface here if it matches these
+# general terms — that's fine, cross-topic overlap is expected.
+
+slug: cbdc
+title: Central Bank Digital Currencies
+description: >
+  Central bank digital currencies worldwide: retail and wholesale design,
+  pilots and launches, interoperability, and the policy and research
+  literature around them.
+status: active
+cadence: monthly
+
+keywords:
+  - term: central bank digital currency
+    language: en
+  - term: CBDC
+    language: en
+  - term: retail CBDC
+    language: en
+  - term: wholesale CBDC
+    language: en
+  - term: digital euro
+    language: en
+  - term: e-CNY
+    language: en
+  - term: digital yuan
+    language: en
+  - term: digital pound
+    language: en
+  - term: CBDC pilot
+    language: en
+  - term: offline CBDC
+    language: en
+
+exclusions:
+  - in-game currency
+  - video game currency
+  - loyalty points
+  - airline miles
+
+anchors: []
+
+organisations: []
+organisation_names: []
+
+places: []
+
+relevance:
+  seed_text: >
+    Central bank digital currencies: design choices (retail vs wholesale,
+    account- vs token-based), pilots and live deployments by central banks,
+    interoperability between CBDC systems, privacy and financial-inclusion
+    debates, and the academic/policy literature evaluating them.
+  threshold: 2
+
+connectors:
+  openalex:
+    queries:
+      - central bank digital currency
+      - CBDC retail payments
+      - CBDC wholesale cross-border
+      - digital euro design
+      - e-CNY digital yuan
+    date_from: "2025-10-02"   # 12-month backfill for the first run
+  gdelt:
+    queries:
+      - "central bank digital currency"
+      - "CBDC pilot"
+  rss:
+    outlets:
+      - bis-speeches
+      - ecb-press
+      - atlantic-council
+      - cepr-voxeu
+      - coindesk
+      - ledgerinsights
+
+alerts: []   # populated once the Phase 2 wizard creates Google Alerts

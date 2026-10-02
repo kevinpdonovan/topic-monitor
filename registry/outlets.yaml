@@ -1,0 +1,107 @@
+# Shared news/trade-press outlet registry. Topics reference outlets by id
+# in their profile.yaml (connectors.rss.outlets). Only `status: tested`
+# outlets are ever resolved into a harvest run (ground rule 4).
+#
+# Every entry below was hit with a live HTTP request on 2026-10-02 from the
+# build sandbox before being added here. "broken" entries are kept, not
+# deleted, so a future session doesn't waste time re-discovering the same
+# dead URL — see the health page for ongoing (post-launch) status instead
+# of this file once the harvest workflow has run a few times.
+
+outlets:
+  - id: bis-speeches
+    url: https://www.bis.org/doclist/cbspeeches.rss
+    venue: BIS central bank speeches
+    organisation: bis
+    source_type: policy_document
+    language: en
+    status: tested
+    verified: 2026-10-02
+    note: "RSS 1.0/RDF, not RSS 2.0 — 51 items live. Central bank speeches, high relevance for CBDC."
+
+  - id: ecb-press
+    url: https://www.ecb.europa.eu/rss/press.html
+    venue: ECB press releases
+    organisation: ecb
+    source_type: policy_document
+    language: en
+    status: tested
+    verified: 2026-10-02
+    note: "Standard RSS 2.0, confirmed live."
+
+  - id: atlantic-council
+    url: https://www.atlanticcouncil.org/feed/
+    venue: Atlantic Council
+    organisation: atlantic-council
+    source_type: report
+    language: en
+    status: tested
+    verified: 2026-10-02
+    note: "100 items live. Covers the GeoEconomics Center's CBDC tracker among other output."
+
+  - id: cepr-voxeu
+    url: https://cepr.org/rss.xml
+    venue: CEPR / VoxEU
+    organisation: cepr
+    source_type: working_paper
+    language: en
+    status: tested
+    verified: 2026-10-02
+    note: "10 items live. The taxonomy-filtered feed (cepr.org/taxonomy/.../feed) 403s — use this one instead."
+
+  - id: coindesk
+    url: https://www.coindesk.com/arc/outboundfeeds/rss
+    venue: CoinDesk
+    organisation: ""
+    source_type: news
+    language: en
+    status: tested
+    verified: 2026-10-02
+    note: "25 items live. General crypto trade press, not CBDC-specific — relies on the keyword gate to filter noise. No trailing slash, or it 308-redirects."
+
+  - id: ledgerinsights
+    url: https://www.ledgerinsights.com/feed/
+    venue: Ledger Insights
+    organisation: ""
+    source_type: news
+    language: en
+    status: tested
+    verified: 2026-10-02
+    note: "Feed is capped at the single latest post — will miss items if they publish more than once between harvest runs. Included anyway as the best CBDC/tokenization trade-press source found; revisit if misses turn out to matter."
+
+  # --- Tried, confirmed broken, excluded. Kept for the record. ---
+  - id: reuters-world
+    url: https://www.reuters.com/world/rss
+    status: broken
+    verified: 2026-10-02
+    note: "HTTP 401."
+  - id: reuters-business-legacy
+    url: https://feeds.reuters.com/reuters/businessNews
+    status: broken
+    verified: 2026-10-02
+    note: "No response (old feeds.reuters.com host is gone)."
+  - id: centralbanking-com
+    url: https://www.centralbanking.com/rss/all
+    status: broken
+    verified: 2026-10-02
+    note: "HTTP 404."
+  - id: bis-press
+    url: https://www.bis.org/press_and_speeches.rss
+    status: broken
+    verified: 2026-10-02
+    note: "HTTP 404 — use bis-speeches instead."
+  - id: imf-news
+    url: "https://www.imf.org/en/News/RSS?Language=ENG"
+    status: broken
+    verified: 2026-10-02
+    note: "HTTP 403 — same datacentre-IP blocking pattern the brief flagged for insubordinate-terminal."
+  - id: ecb-press-alt
+    url: https://www.ecb.europa.eu/press/pr/html/index.en.rss.xml
+    status: broken
+    verified: 2026-10-02
+    note: "HTTP 404 — use ecb-press instead."
+  - id: brookings
+    url: https://www.brookings.edu/feed/
+    status: broken
+    verified: 2026-10-02
+    note: "Redirects to the Brookings homepage, not a feed."

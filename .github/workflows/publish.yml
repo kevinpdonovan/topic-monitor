@@ -1,0 +1,64 @@
+name: Publish review
+
+on:
+  issues:
+    types: [closed]
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    if: contains(github.event.issue.labels.*.name, 'review') && github.event.issue.state_reason == 'completed'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: pip install -r requirements.txt
+
+      - name: Find the topic label
+        id: topic
+        env:
+          ISSUE_LABELS_JSON: ${{ toJSON(github.event.issue.labels) }}
+        run: |
+          slug=$(python3 -c "
+          import json, os
+          labels = json.loads(os.environ['ISSUE_LABELS_JSON'])
+          for l in labels:
+              if l['name'].startswith('topic:'):
+                  print(l['name'].split(':', 1)[1])
+                  break
+          ")
+          if [ -z "$slug" ]; then
+            echo "no topic:<slug> label found on this issue" >&2
+            exit 1
+          fi
+          echo "slug=$slug" >> "$GITHUB_OUTPUT"
+
+      - name: Save issue body
+        # Never interpolate ${{ github.event.issue.body }} directly into a
+        # run: script (classic script-injection vector even for a
+        # single-user repo) — pass it through env instead, where the
+        # runner treats it as an opaque value, not shell source.
+        env:
+          ISSUE_BODY: ${{ github.event.issue.body }}
+        run: printf '%s\n' "$ISSUE_BODY" > /tmp/issue_body.md
+
+      - name: Publish decisions and rebuild the site
+        run: |
+          python -m engine publish \
+            --topic "${{ steps.topic.outputs.slug }}" \
+            --issue-body-file /tmp/issue_body.md \
+            --run "$(date -u +%F)"
+
+      - name: Commit decisions and built site
+        run: |
+          git config user.name "topic-monitor-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add data/decisions/
+          git diff --staged --quiet || git commit -m "Publish ${{ steps.topic.outputs.slug }} review (closes #${{ github.event.issue.number }})"
+          git push

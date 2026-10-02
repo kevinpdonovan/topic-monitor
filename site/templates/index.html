@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}topic-monitor{% endblock %}
+{% block content %}
+<h1>Active topics</h1>
+<p class="muted">{{ topics|length }} topic{{ '' if topics|length == 1 else 's' }} monitored.</p>
+<div class="cards">
+  {% for t in topics %}
+  <div class="card">
+    <a href="{{ t.slug }}/index.html">{{ t.title }}</a>
+    <div class="count">{{ t.accepted_count }}</div>
+    <div class="muted">accepted items &middot; {{ t.cadence }}</div>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}
