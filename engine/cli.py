@@ -12,6 +12,12 @@ engine/pipeline/backfill.py for why). Not part of the regular cadence.
 closed review issue back into decisions, update the corpus, rebuild the site.
 
 `python -m engine build` — just re-render the site from current data/.
+
+`python -m engine wizard-expand --seed "term1" "term2"` — sample OpenAlex
+for the seed terms, print candidate related terms ranked by how often they
+co-occur. A research aid for a live session working a new-topic request
+(see CLAUDE.md, "Handling a new-topic request") — it doesn't decide
+anything or write any files itself.
 """
 from __future__ import annotations
 
@@ -286,6 +292,23 @@ def cmd_build(args) -> int:
     return 0
 
 
+def cmd_wizard_expand(args) -> int:
+    from engine.wizard.expand import expand_seed_terms
+
+    contact_email = os.environ.get("CONTACT_EMAIL", "")
+    if not contact_email:
+        print("CONTACT_EMAIL not set — required for the OpenAlex polite pool", file=sys.stderr)
+        return 1
+
+    result = expand_seed_terms(args.seed, contact_email=contact_email, sample_size=args.sample_size)
+    print(f"seeds: {result['seeds']}")
+    print(f"sampled {result['sampled_titles']} titles\n")
+    print(f"{'term':<40} {'score':>6} {'count':>6}  example")
+    for c in result["candidates"]:
+        print(f"{c['term']:<40} {c['total_score']:>6} {c['count']:>6}  {c['example_title'][:65]}")
+    return 0
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(prog="python -m engine")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -313,6 +336,11 @@ def main(argv=None) -> int:
 
     p_build = sub.add_parser("build", help="re-render the site from current data/")
     p_build.set_defaults(func=cmd_build)
+
+    p_wizard = sub.add_parser("wizard-expand", help="sample OpenAlex for seed terms, print candidate related terms")
+    p_wizard.add_argument("--seed", nargs="+", required=True, help="one or more seed keywords")
+    p_wizard.add_argument("--sample-size", type=int, default=100)
+    p_wizard.set_defaults(func=cmd_wizard_expand)
 
     args = parser.parse_args(argv)
     return args.func(args)

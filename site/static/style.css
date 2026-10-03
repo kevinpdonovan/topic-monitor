@@ -70,3 +70,13 @@ th { color: var(--muted); font-weight: 600; }
 .card { border: 1px solid var(--line); border-radius: 8px; padding: 1rem; min-width: 200px; flex: 1; }
 .card a { color: var(--fg); text-decoration: none; font-weight: 600; }
 .card .count { font-size: 1.8rem; font-weight: 700; color: var(--accent); }
+
+#new-topic-form { display: flex; flex-direction: column; gap: 0.6rem; max-width: 520px; margin-top: 0.75rem; }
+#new-topic-form input, #new-topic-form textarea {
+  padding: 0.5rem 0.6rem; border: 1px solid var(--line); border-radius: 6px;
+  background: var(--bg); color: var(--fg); font: inherit; resize: vertical;
+}
+#new-topic-form button {
+  align-self: flex-start; padding: 0.45rem 0.9rem; border: 1px solid var(--accent);
+  border-radius: 6px; background: var(--accent); color: var(--bg); font-weight: 600; cursor: pointer;
+}

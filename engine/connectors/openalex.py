@@ -30,7 +30,7 @@ TYPE_MAP = {
 }
 
 
-def _session(contact_email: str) -> requests.Session:
+def make_session(contact_email: str) -> requests.Session:
     s = requests.Session()
     s.headers["User-Agent"] = f"topic-monitor/0.1 (mailto:{contact_email})"
     return s
@@ -93,7 +93,7 @@ def harvest_openalex(
     """Run each query as an OpenAlex keyword search. Returns (items, health)."""
     if not contact_email:
         raise ValueError("harvest_openalex needs a contact_email for the polite pool")
-    session = _session(contact_email)
+    session = make_session(contact_email)
     items = []
     health = []
     for query in queries:

@@ -12,4 +12,19 @@
   </div>
   {% endfor %}
 </div>
+
+<h2>Request a new topic</h2>
+<p class="muted">
+  Give a few seed terms. This opens a GitHub issue under your account —
+  nothing here talks to a model directly. The next time a Claude Code
+  session works through it, it'll propose related terms and ask a couple
+  of clarifying questions in the issue thread before building the topic.
+</p>
+<form id="new-topic-form">
+  <input id="new-topic-seed" type="text" placeholder="e.g. mould, damp housing" aria-label="Seed terms" required>
+  <textarea id="new-topic-notes" placeholder="Optional notes — angles, places, disciplines you have in mind" aria-label="Notes" rows="3"></textarea>
+  <button type="submit">Open request on GitHub</button>
+</form>
+
+<script src="{{ root }}static/new-topic.js"></script>
 {% endblock %}

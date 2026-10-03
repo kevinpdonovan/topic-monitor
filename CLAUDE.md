@@ -151,6 +151,7 @@ brief, and why.
 | Monthly view | **Client-side toggle on the same page**, not separate pre-rendered monthly pages | Kevin wants to view publications by month as well as the full archive. A JS toggle (grouping the same `items.json` by `date`'s year-month) does both without doubling the number of generated pages or losing search/filter state when switching views. |
 | Quality tiers (high/medium/low) | **AI-judged per item, NOT from journal prestige/h-index/citations** | Kevin was explicit: favor empirical work with real evidence (esp. case studies) and strong theoretical/conceptual contributions; hold "systematic reviews"/"literature reviews" to a high bar by default; and actively value heterodox, anti-systemic and Global South political economy work rather than penalizing it for being unfamiliar or non-mainstream. Implemented as a rubric in `score.py`'s AI prompt, with `registry/quality_signals.yaml` supplying a list of known-rigorous heterodox/Global South sources as positive context — deliberately asymmetric (no equivalent "mainstream prestige" list), since adding one would just reproduce the Eurocentric bias this exists to counter. |
 | Historical backfill | **One-time, manually-triggered, scholarship-only, age-weighted citation pre-filter, start at 1 year back** | Kevin wants to pull further back than the regular 12-month window, winnowed so an old uncited piece doesn't make the cut but a recent one isn't held to the same citation bar (it hasn't had time to accumulate any). `engine/pipeline/backfill.py`'s `min_citations_for_age()` gives a grace period (default 90 days, always passes regardless of citations) then requires linearly more citations per month beyond it — explicitly a volume-reduction step before the same AI quality rubric runs, not a quality judgment itself (a flat citation cutoff would reproduce exactly the recency bias the quality-tier design above was built to avoid). GDELT/RSS have no multi-year history via their feeds, so this is OpenAlex-only. Started at 1 year back per Kevin's instruction, not the 5 he first floated — `--years-back` is a CLI/workflow parameter, trivial to push further once the 1-year run's output has been sanity-checked. |
+| New-topic wizard entry point | **Site form → pre-filled GitHub issue → a live Claude Code session works it from there, asynchronously** | Kevin wants to search/request a new topic from the site and have Claude ask clarifying questions. A static GitHub Pages site has no backend, and putting an Anthropic API key in client-side JS to enable live chat would be a real security/cost problem — confirmed with Kevin this async, issue-mediated hand-off (matching how review issues already work, and matching the build brief's own wizard design, which explicitly runs "inside a Claude Code session so a model is available") is the right shape, not instant in-page chat. See "Handling a new-topic request" below. |
 
 ## Open questions (not blocking Phase 0/1, revisit before Phase 2)
 
@@ -405,8 +406,62 @@ clear, then decide whether to write," not "clear only when writing."
     provider (Claude has none) that wasn't part of the API decision Kevin
     already made. Revisit once there's enough accept/reject history to
     tell whether the keyword gate's false-negative rate actually matters.
-  - The `new-topic` wizard, organisation registry, grey-lit/book
-    connectors, official-document scrapers — all Phase 2.
+  - The organisation registry, grey-lit/book connectors, official-document
+    scrapers — still Phase 2. The new-topic wizard's entry point and
+    expansion tooling are built now (see "Handling a new-topic request"
+    below), ahead of schedule, at Kevin's request — the rest of Phase 2
+    is unaffected.
+
+## Handling a new-topic request
+
+The site's homepage has a "Request a new topic" form
+(`site/templates/index.html` + `site/static/new-topic.js`) that opens a
+pre-filled GitHub issue, labeled `new-topic`, under Kevin's own account —
+nothing on the page talks to a model. **Nothing automated processes that
+issue.** A live Claude Code session has to pick it up — when you see one
+open:
+
+1. Read the seed terms and notes in the issue body.
+2. Run `CONTACT_EMAIL=<email> python -m engine wizard-expand --seed <term1> <term2> ...`
+   to sample OpenAlex and see what related concepts/keywords come up
+   ranked by relevance score. This is a research aid, not a
+   decision-maker — read the candidates yourself and use judgment.
+   Confirmed live, 2026-10-03, seeding "mould" + "housing UK": a
+   polysemous seed term pulls in multiple unrelated senses (that one got
+   metal-casting, cheese-making and mycology alongside the intended
+   damp-housing-conditions sense) — raw co-occurrence frequency alone is
+   noisy (OpenAlex tags broad discipline-level concepts like "Economics"/
+   "Biology" onto nearly everything); `wizard-expand` already filters to
+   specific-enough concepts and ranks by relevance score, but the
+   remaining ambiguity between genuinely different senses/angles is
+   exactly what step 3 is for.
+3. Comment on the issue with a shortlist of proposed keywords — grouped
+   by the different senses or angles you're seeing, if the seed term
+   turned out ambiguous — and 1–3 clarifying questions (which angles,
+   which disciplines, which places/languages matter, anything to
+   exclude). Don't guess past real ambiguity; ask, the way the brief
+   itself expects ("do you want this aspect?", "these disciplinary
+   perspectives?").
+4. Once Kevin replies, iterate if needed, then write
+   `topics/<slug>/profile.yaml` (same shape as `topics/cbdc/profile.yaml`)
+   and `topics/<slug>/alerts.md` — the Google Alerts checklist per the
+   build brief's "Alerts (semi-automated)" step: query strings for Kevin
+   (or Claude in Chrome acting in his account) to paste into Google
+   Alerts by hand, pasting the resulting feed URLs back. **Never** try to
+   script Google Alerts creation itself — it has no API, and the brief is
+   explicit that nothing should drive a logged-in browser to fake one.
+5. Open a PR adding the new topic folder. Don't harvest for it until
+   Kevin merges — the PR is the approval gate, same principle as every
+   other topic-folder change.
+6. Close the `new-topic` issue once the PR is open (or merged — either is
+   fine, just don't leave it open indefinitely once the real work has
+   moved to the PR).
+
+This is deliberately not automated end-to-end. Per the build brief's own
+design, the wizard "runs inside a Claude Code session so a model is
+available" — the judgment calls here (which terms actually matter, what
+Kevin means by an ambiguous seed term) need a live conversation, not a
+script making assumptions.
 
 ## Next steps before Phase 1 is fully closed out
 
@@ -461,3 +516,15 @@ clear, then decide whether to write," not "clear only when writing."
     (`--topic cbdc --years-back 1`, GitHub's default inputs match that)
     once OpenAlex's rate limit from today's repeated testing has cleared,
     same caution as #13.
+15. Added the new-topic wizard's entry point (site form → pre-filled
+    GitHub issue) and `wizard-expand` tooling (same session) — see
+    "Handling a new-topic request" above. Created the `new-topic` label
+    directly in repo Settings (one-time setup, same as `review`/
+    `topic:*`). Verified live: the form builds a correct pre-filled issue
+    URL (checked via the actual GitHub "Create new issue" page — title,
+    body, and label all populated correctly) and `wizard-expand` found
+    genuinely useful, well-ranked candidate terms on a real run (seeded
+    "mould" + "housing UK"). Not yet pushed. No `new-topic` issue has
+    been worked end-to-end yet — next real request is the first live
+    test of steps 3–6 above.
+16. Push this commit.
