@@ -1,0 +1,110 @@
+{
+  "run": "2026-10-03",
+  "run_at": "2026-10-03T09:38:49.427360+00:00",
+  "sources": [
+    {
+      "count": 150,
+      "fail_streak": 0,
+      "note": "",
+      "ok": true,
+      "source": "openalex:central bank digital currency"
+    },
+    {
+      "count": 150,
+      "fail_streak": 0,
+      "note": "",
+      "ok": true,
+      "source": "openalex:CBDC retail payments"
+    },
+    {
+      "count": 150,
+      "fail_streak": 0,
+      "note": "",
+      "ok": true,
+      "source": "openalex:CBDC wholesale cross-border"
+    },
+    {
+      "count": 150,
+      "fail_streak": 0,
+      "note": "",
+      "ok": true,
+      "source": "openalex:digital euro design"
+    },
+    {
+      "count": 150,
+      "fail_streak": 0,
+      "note": "",
+      "ok": true,
+      "source": "openalex:e-CNY digital yuan"
+    },
+    {
+      "count": 0,
+      "fail_streak": 1,
+      "note": "HTTP 429 rate-limited",
+      "ok": false,
+      "source": "gdelt:central bank digital currency"
+    },
+    {
+      "count": 0,
+      "fail_streak": 1,
+      "note": "HTTP 429 rate-limited",
+      "ok": false,
+      "source": "gdelt:CBDC pilot"
+    },
+    {
+      "count": 50,
+      "fail_streak": 0,
+      "note": "",
+      "ok": true,
+      "source": "outlet_rss:bis-speeches"
+    },
+    {
+      "count": 15,
+      "fail_streak": 0,
+      "note": "",
+      "ok": true,
+      "source": "outlet_rss:ecb-press"
+    },
+    {
+      "count": 100,
+      "fail_streak": 0,
+      "note": "",
+      "ok": true,
+      "source": "outlet_rss:atlantic-council"
+    },
+    {
+      "count": 10,
+      "fail_streak": 0,
+      "note": "",
+      "ok": true,
+      "source": "outlet_rss:cepr-voxeu"
+    },
+    {
+      "count": 25,
+      "fail_streak": 0,
+      "note": "",
+      "ok": true,
+      "source": "outlet_rss:coindesk"
+    },
+    {
+      "count": 1,
+      "fail_streak": 0,
+      "note": "",
+      "ok": true,
+      "source": "outlet_rss:ledgerinsights"
+    },
+    {
+      "count": 0,
+      "fail_streak": 1,
+      "note": "Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'This API key is not scoped to a workspace, so this request must include the anthropic-workspace-id header with the ID of the workspace to use. Add the header, or use an API key that is scoped to a workspace.'}, 'request_id': None}",
+      "ok": false,
+      "source": "ai_score"
+    }
+  ],
+  "stats": {
+    "items_total": 951,
+    "sources_failing": 3,
+    "sources_ok": 11,
+    "sources_total": 14
+  }
+}
