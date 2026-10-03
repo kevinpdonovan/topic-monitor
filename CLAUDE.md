@@ -185,10 +185,14 @@ topic-monitor/
 
 ## Status
 
-Phase 0 done. Phase 1 (engine with scholarship and news) written and
-locally verified as far as this sandbox allows; needs a live GitHub
-Actions run (Python 3.12) to fully confirm GDELT/RSS/AI scoring before
-it's "done done." Specifics:
+Phase 0 done. Phase 1 (engine with scholarship and news) written, and as
+of the second live run on 2026-10-03 confirmed end-to-end on real data:
+OpenAlex, GDELT and all 6 RSS outlets harvest correctly, dedupe no longer
+crashes, and the review-issue split fix is in place for when the
+candidate list is large. The one thing still not live-verified is AI
+scoring, blocked on Kevin fixing the API key's workspace scoping (see
+below) — the pipeline doesn't depend on it to function, just to produce
+relevance scores/pre-ticks. Specifics:
 
 **Built:** item schema (`engine/pipeline/items.py`), JSONL corpus +
 decisions store (`corpus.py`), connectors for OpenAlex / GDELT / generic
@@ -239,16 +243,45 @@ wasn't enabled yet for this repo. Fixed directly in repo Settings → Pages
 → Source: GitHub Actions (one-time setup, not a review decision, so done
 without asking).
 
-**Still not confirmed live, pending the re-run:**
-  - GDELT: reachable (not blocked) but 429 rate-limited from the build
-    sandbox's IP both times it was tried from there. Whether it's also
-    rate-limited from the Actions runner's IP is still unconfirmed — the
-    first live run never got far enough to show the GDELT health rows
-    before the dedupe crash above. Check the health page after the re-run.
-  - RSS and AI scoring: same — the crash happened after harvesting but
-    during dedupe, so health data exists for OpenAlex/GDELT/RSS connector
-    calls from that run, but the review-issue/scoring stage never ran.
-    Check the re-run's health page and the opened issue.
+**Second live run (2026-10-03, same day, after the dedupe fix): harvest
+itself succeeded — OpenAlex, GDELT and all 6 RSS outlets all ran and
+reported honest health — but issue creation failed on a second real bug:**
+`data/health/2026-10-03.json` and `topics/cbdc/review/2026-10-03.md` (both
+committed by the run before it failed, so this is real production data,
+not a guess):
+  - **951 raw items** harvested (OpenAlex 150×5 queries — capped by
+    `max_pages=3`, not a real ceiling; 6/6 RSS outlets ok, counts matching
+    the registry notes exactly, including ledgerinsights' known 1-item
+    cap), → **322 keyword-gate candidates**, comfortably clearing the
+    ≥30-item criterion with real multi-connector data, not just OpenAlex.
+  - **GDELT: confirmed 429-rate-limited from the GitHub Actions runner's
+    IP too**, not just this build sandbox — both queries failed the same
+    way. Not a bug (the connector is supposed to report this honestly
+    rather than retry-loop into a longer outage), just a confirmed, real
+    constraint on this source.
+  - **AI scoring failed**: `Error code: 400 ... "This API key is not
+    scoped to a workspace ... Add the header, or use an API key that is
+    scoped to a workspace."` — the `ANTHROPIC_API_KEY` Kevin added is an
+    org-level key, not a workspace-scoped one. This needs Kevin to fix in
+    the Anthropic Console (Settings → API Keys → create a key scoped to a
+    specific workspace) and update the GitHub secret — not something to
+    route around in code. Scoring still ran in keyword-gate-only mode
+    (that stage doesn't need AI), so this blocked relevance scores/tags/
+    featured-starring, not the harvest itself.
+  - **The real bug**: `topics/cbdc/review/2026-10-03.md` is 86,602
+    characters — over GitHub's 65,536-char issue-body limit, so
+    `gh issue create` failed with `Body is too long`. My local smoke test
+    (Status, above) only used OpenAlex and landed at 60KB; add GDELT/RSS
+    and it crossed the real limit. Fixed by splitting the render into
+    multiple issues when needed: `review.issue_bodies()` packs items into
+    ≤60,000-char chunks at item-line boundaries (never mid-line), each a
+    self-contained issue body with its own "(part i of n)" header: `cli.py`
+    now writes one review `.md` file per chunk, and `harvest.yml`'s
+    existing per-file issue-creation loop picks all of them up unchanged —
+    each part is reviewed and closed independently, and `publish.yml`
+    needs no changes since it already only looks at the one issue that
+    closed. Added a regression test built from this real 322-item/86KB
+    case shape (`test_issue_bodies_splits_when_over_the_limit_regression`).
 
 ## Known limitations
 
@@ -273,21 +306,27 @@ without asking).
 
 ## Next steps before Phase 1 is fully closed out
 
-1. ~~Push this commit~~ — done (Phase 1 commit `aac9e03`, pushed via
-   GitHub Desktop, same manual step as Phase 0 — no stored git credential
-   on this machine).
-2. ~~Add `ANTHROPIC_API_KEY` and `CONTACT_EMAIL`~~ — done by Kevin
-   (`TAGGER_MODEL` left unset, code defaults to `claude-haiku-4-5`).
-3. ~~Run `Harvest` by hand~~ — done, failed on the dedupe crash above.
-   Fix is written; needs a new commit pushed, then re-run.
-4. Push the dedupe fix (same GitHub Desktop step).
-5. Re-run `Harvest` (workflow_dispatch). Check its health output for
-   GDELT/RSS/AI-scoring status, and that it opens a real review issue.
-6. Kevin reviews and closes that issue.
-7. Confirm `Publish review` fired (Actions tab → green check, and
+1. ~~Push Phase 1 commit~~ — done (`aac9e03`, via GitHub Desktop — no
+   stored git credential on this machine, so every push needs that step).
+2. ~~Add `ANTHROPIC_API_KEY` and `CONTACT_EMAIL`~~ — done by Kevin.
+3. ~~Run `Harvest` by hand (1st try)~~ — failed on the dedupe crash. Fixed,
+   pushed (`8770479`), confirmed GitHub Pages also needed enabling in repo
+   Settings (done).
+4. ~~Re-run `Harvest` (2nd try)~~ — harvest itself succeeded (OpenAlex,
+   GDELT, all 6 RSS outlets, real health data, 322 candidates); failed at
+   issue-creation on the 65,536-char body limit. Fixed via `issue_bodies()`
+   chunking (this commit).
+5. Push this commit (same GitHub Desktop step).
+6. Re-run `Harvest` a third time — this time should open a real review
+   issue (or several, if still over the per-issue limit) on GitHub.
+7. Kevin: fix the Anthropic API key's workspace scoping (Console →
+   Settings → API Keys → create/use a key scoped to a specific workspace)
+   and update the `ANTHROPIC_API_KEY` secret, whenever convenient — not
+   blocking the review issue, only blocks AI relevance scores/pre-ticks.
+8. Kevin reviews and closes the review issue(s).
+9. Confirm `Publish review` fired (Actions tab → green check, and
    `data/decisions/cbdc.jsonl` has a new commit) and `Build and deploy
-   site` fired after it (triggered by the decisions-file push) — then open
-   the live Pages URL (shown in the repo's Settings → Pages, and as the
-   `deploy` job's output in that workflow run) and check the CBDC topic
-   page shows the accepted items and the health page shows real source
-   status.
+   site` fired after it — then open the live Pages URL (Settings → Pages,
+   or the `deploy` job's output in that workflow run) and check the CBDC
+   topic page shows the accepted items and the health page shows real
+   source status.

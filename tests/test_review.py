@@ -1,5 +1,5 @@
 from engine.pipeline.items import make_item
-from engine.pipeline.review import issue_body, parse_review
+from engine.pipeline.review import issue_bodies, issue_body, parse_review
 
 PROFILE = {"slug": "cbdc", "title": "Central Bank Digital Currencies"}
 
@@ -36,3 +36,42 @@ def test_parse_review_respects_manual_unticking():
     parsed = parse_review(edited)
     assert items[0]["id"] not in parsed["accepted"]
     assert items[0]["id"] in parsed["all"]
+
+
+def test_issue_bodies_returns_one_part_when_it_fits():
+    items = [make_item(title="A relevant CBDC article", source_type="article", connector="openalex", doi="10.1/a")]
+    parts = issue_bodies(items, PROFILE, run_label="2026-10")
+    assert len(parts) == 1
+    suffix, body = parts[0]
+    assert suffix == ""
+    assert items[0]["id"] in body
+
+
+def test_issue_bodies_splits_when_over_the_limit_regression():
+    # Regression test for a real failure on the first live harvest run
+    # (2026-10-03): GitHub's createIssue rejected the body with "Body is
+    # too long (maximum is 65536 characters)" once GDELT/RSS results were
+    # added on top of OpenAlex's — this repo's own local smoke test alone
+    # produced a 60KB body from OpenAlex results for one topic.
+    items = [
+        make_item(
+            title=f"CBDC working paper number {i} with a reasonably long descriptive title",
+            source_type="article", connector="openalex", doi=f"10.1/item-{i}",
+            abstract="x" * 50,
+        )
+        for i in range(400)
+    ]
+    parts = issue_bodies(items, PROFILE, run_label="2026-10", max_chars=5000)
+    assert len(parts) > 1
+
+    all_ids_seen = set()
+    for i, (suffix, body) in enumerate(parts, start=1):
+        assert f"part {i} of {len(parts)}" in suffix
+        assert len(body) <= 5000 + 500  # a little slack for the heading/intro overhead on each part
+        parsed = parse_review(body)
+        all_ids_seen |= parsed["all"]
+
+    # Every item appears in exactly one part, none lost, none duplicated.
+    assert all_ids_seen == {it["id"] for it in items}
+    total_occurrences = sum(len(parse_review(body)["all"]) for _suffix, body in parts)
+    assert total_occurrences == len(items)

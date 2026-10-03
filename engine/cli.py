@@ -25,7 +25,7 @@ from engine.pipeline.corpus import Corpus, DecisionStore
 from engine.pipeline.dedupe import dedupe
 from engine.pipeline.health import aggregate_health, load_health, save_health
 from engine.pipeline.profile import REPO_ROOT, list_topics, load_profile, outlets_for_topic
-from engine.pipeline.review import issue_body, parse_review
+from engine.pipeline.review import issue_bodies, parse_review
 from engine.pipeline.score import ai_score, run_keyword_gate
 
 DATA_DIR = REPO_ROOT / "data"
@@ -112,12 +112,18 @@ def cmd_harvest(args) -> int:
         for it in deduped:
             corpus.upsert(it)
 
-        body = issue_body(candidates, profile, run_label=run_label)
+        if not candidates:
+            print(f"{slug}: 0 new candidates, no review file written")
+            continue
+
         review_dir = REPO_ROOT / "topics" / slug / "review"
         review_dir.mkdir(parents=True, exist_ok=True)
-        review_path = review_dir / f"{run_label}.md"
-        review_path.write_text(body, encoding="utf-8")
-        print(f"{slug}: {len(candidates)} candidates -> {review_path.relative_to(REPO_ROOT)}")
+        parts = issue_bodies(candidates, profile, run_label=run_label)
+        for i, (_suffix, body) in enumerate(parts, start=1):
+            review_path = review_dir / (f"{run_label}.md" if len(parts) == 1 else f"{run_label}-part{i}.md")
+            review_path.write_text(body, encoding="utf-8")
+            print(f"{slug}: {len(candidates)} candidates -> {review_path.relative_to(REPO_ROOT)}"
+                  + (f" (part {i}/{len(parts)})" if len(parts) > 1 else ""))
 
     corpus.save()
 
