@@ -82,15 +82,22 @@ class DecisionStore:
         return set(self._latest.keys())
 
     def accepted(self) -> list:
-        """Latest decision per id, filtered to accepted. One row per id: {id, decision, run, featured}."""
+        """Latest decision per id, filtered to accepted. One row per id:
+        {id, decision, run, featured, quality, relevance} — quality/
+        relevance are the AI scorer's output at review time (None if AI
+        scoring didn't run that cycle), carried over from the issue body
+        since nothing else persists them (see review.parse_review)."""
         return [row for row in self._latest.values() if row["decision"] == "accepted"]
 
     def get(self, item_id: str):
         return self._latest.get(item_id)
 
-    def record(self, item_id: str, decision: str, *, run: str, featured: bool = False) -> None:
+    def record(self, item_id: str, decision: str, *, run: str, featured: bool = False, quality=None, relevance=None, tags=None) -> None:
         assert decision in ("accepted", "rejected")
-        row = {"id": item_id, "decision": decision, "run": run, "featured": featured}
+        row = {
+            "id": item_id, "decision": decision, "run": run, "featured": featured,
+            "quality": quality, "relevance": relevance, "tags": list(tags or []),
+        }
         self._rows.append(row)
         self._latest[item_id] = row
 

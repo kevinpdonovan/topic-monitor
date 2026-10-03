@@ -5,20 +5,42 @@
 <p class="muted">{{ topic.description }}</p>
 <p class="muted">{{ items|length }} accepted items &middot; cadence: {{ topic.cadence }}</p>
 
-{% for source_type, group in groups %}
-<h2>{{ source_type }} ({{ group|length }})</h2>
-<ul class="items">
-  {% for item in group %}
-  <li>
-    <a class="title" href="{{ item.url or item.pdf_url }}">{{ item.title }}</a>
-    {% if item.featured %}<span class="badge">featured</span>{% endif %}
-    <div class="meta">
-      {{ item.authors|join(', ') if item.authors else item.organisation }}
-      {% if item.venue %} &middot; {{ item.venue }}{% endif %}
-      {% if item.date %} &middot; {{ item.date }}{% endif %}
+<div id="app" data-items-url="items.json">
+  <div id="controls" hidden>
+    <input id="search-input" type="search" placeholder="Search titles, authors, venues, tags…" aria-label="Search">
+    <div class="quality-filter">
+      <label><input type="checkbox" value="high" checked> High</label>
+      <label><input type="checkbox" value="medium" checked> Medium</label>
+      <label><input type="checkbox" value="low" checked> Low</label>
+      <label><input type="checkbox" value="unscored" checked> Unscored</label>
     </div>
-  </li>
-  {% endfor %}
-</ul>
-{% endfor %}
+    <div class="view-toggle">
+      <button type="button" data-view="all" class="active">All time</button>
+      <button type="button" data-view="month">By month</button>
+    </div>
+    <p class="muted" id="result-count"></p>
+  </div>
+
+  <div id="results">
+    {% for source_type, group in groups %}
+    <h2>{{ source_type }} ({{ group|length }})</h2>
+    <ul class="items">
+      {% for item in group %}
+      <li>
+        <a class="title" href="{{ item.url or item.pdf_url }}">{{ item.title }}</a>
+        {% if item.quality %}<span class="badge quality-{{ item.quality }}">{{ item.quality|capitalize }}</span>{% else %}<span class="badge quality-unscored">Unscored</span>{% endif %}
+        {% if item.featured %}<span class="badge featured">featured</span>{% endif %}
+        <div class="meta">
+          {{ item.authors|join(', ') if item.authors else item.organisation }}
+          {% if item.venue %} &middot; {{ item.venue }}{% endif %}
+          {% if item.date %} &middot; {{ item.date }}{% endif %}
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+    {% endfor %}
+  </div>
+</div>
+
+<script src="{{ root }}static/topic.js"></script>
 {% endblock %}

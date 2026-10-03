@@ -112,7 +112,9 @@ def cmd_harvest(args) -> int:
             s = scored["scores"].get(it["id"])
             if s:
                 it["_ai_relevance"] = s["relevance"]
+                it["_ai_quality"] = s["quality"]
                 it["_ai_reason"] = s["reason"]
+                it["_ai_tags"] = s.get("tags", [])
 
         for it in deduped:
             corpus.upsert(it)
@@ -161,7 +163,12 @@ def cmd_publish(args) -> int:
     decisions = DecisionStore(DATA_DIR / "decisions" / f"{args.topic}.jsonl")
     for item_id in parsed["all"]:
         decision = "accepted" if item_id in parsed["accepted"] else "rejected"
-        decisions.record(item_id, decision, run=args.run, featured=item_id in parsed["featured"])
+        item_meta = parsed["meta"].get(item_id, {})
+        decisions.record(
+            item_id, decision, run=args.run, featured=item_id in parsed["featured"],
+            quality=item_meta.get("quality"), relevance=item_meta.get("relevance"),
+            tags=item_meta.get("tags"),
+        )
     decisions.save()
     print(f"{args.topic}: {len(parsed['accepted'])} accepted, {len(parsed['all']) - len(parsed['accepted'])} rejected")
 

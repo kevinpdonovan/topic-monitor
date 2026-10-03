@@ -20,7 +20,8 @@ SOURCE_TYPE_HEADINGS = [
 ]
 
 LINE_RX = re.compile(
-    r"^-\s*\[(?P<tick>[ xX])\]\s*(?P<star>★\s*)?\[(?P<title>[^\]]*)\]\((?P<url>[^)]*)\).*?<!--id:(?P<id>[0-9a-f]{10})-->\s*$",
+    r"^-\s*\[(?P<tick>[ xX])\]\s*(?P<star>★\s*)?\[(?P<title>[^\]]*)\]\((?P<url>[^)]*)\).*?"
+    r"<!--id:(?P<id>[0-9a-f]{10});quality:(?P<quality>[a-z]*);relevance:(?P<relevance>\d*);tags:(?P<tags>.*?)-->\s*$",
     re.MULTILINE,
 )
 
@@ -36,14 +37,21 @@ def _pretick(item: dict) -> bool:
 def _line(item: dict) -> str:
     tick = "x" if _pretick(item) else " "
     ai = item.get("_ai_relevance")
+    quality = item.get("_ai_quality")
+    tags = [t.replace("|", "/").replace(";", ",") for t in item.get("_ai_tags", []) if t]
     star = "★ " if ai == 3 else ""
     meta_bits = [b for b in [item.get("venue"), item.get("date"), item.get("organisation")] if b]
     meta = " · ".join(meta_bits)
-    badge = f" `relevance:{ai}`" if ai is not None else ""
+    badges = "".join(
+        f" `{label}:{value}`"
+        for label, value in (("relevance", ai), ("quality", quality))
+        if value is not None
+    )
     reason = item.get("_ai_reason") or item.get("_gate", {}).get("reason", "")
     reason_bit = f" — _{reason}_" if reason else ""
     url = item.get("url") or item.get("pdf_url") or ""
-    return f"- [{tick}] {star}[{item['title']}]({url}) · {meta}{badge}{reason_bit} <!--id:{item['id']}-->"
+    comment = f"<!--id:{item['id']};quality:{quality or ''};relevance:{ai if ai is not None else ''};tags:{'|'.join(tags)}-->"
+    return f"- [{tick}] {star}[{item['title']}]({url}) · {meta}{badges}{reason_bit} {comment}"
 
 
 def _grouped_blocks(items: list) -> list:
@@ -164,16 +172,25 @@ def issue_bodies(items: list, profile: dict, *, run_label: str, max_chars: int =
 def parse_review(body: str) -> dict:
     """Parse a (closed) review issue body.
 
-    Returns {"accepted": set, "featured": set, "all": set} — `all` is every
-    item id that appeared in the issue (ticked or not), so the caller can
-    record explicit rejections for anything left unticked, not just accepts.
+    Returns {"accepted": set, "featured": set, "all": set, "meta": dict} —
+    `all` is every item id that appeared in the issue (ticked or not), so
+    the caller can record explicit rejections for anything left unticked,
+    not just accepts. `meta` maps id -> {"quality": str|None, "relevance":
+    int|None, "tags": list[str]}, recovered from the HTML comment so this
+    survives into the decision record (and from there, onto the site) even
+    though the issue itself only round-trips through its markdown body.
     """
     accepted, featured, all_ids = set(), set(), set()
+    meta: dict = {}
     for match in LINE_RX.finditer(body):
         item_id = match.group("id")
         all_ids.add(item_id)
+        quality = match.group("quality") or None
+        relevance_raw = match.group("relevance")
+        tags = [t for t in match.group("tags").split("|") if t]
+        meta[item_id] = {"quality": quality, "relevance": int(relevance_raw) if relevance_raw else None, "tags": tags}
         if match.group("tick").lower() == "x":
             accepted.add(item_id)
             if match.group("star"):
                 featured.add(item_id)
-    return {"accepted": accepted, "featured": featured, "all": all_ids}
+    return {"accepted": accepted, "featured": featured, "all": all_ids, "meta": meta}

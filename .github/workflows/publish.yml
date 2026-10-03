@@ -55,10 +55,25 @@ jobs:
             --issue-body-file /tmp/issue_body.md \
             --run "$(date -u +%F)"
 
-      - name: Commit decisions and built site
+      - name: Commit decisions
         run: |
           git config user.name "topic-monitor-bot"
           git config user.email "actions@users.noreply.github.com"
           git add data/decisions/
           git diff --staged --quiet || git commit -m "Publish ${{ steps.topic.outputs.slug }} review (closes #${{ github.event.issue.number }})"
           git push
+
+  deploy:
+    needs: publish
+    # A push made with the default GITHUB_TOKEN (the commit above) does not
+    # trigger pages.yml's own `on: push` — GitHub's anti-recursion
+    # protection — so call it directly as a reusable workflow instead of
+    # relying on that. (First found live: closing issues #1/#2 on
+    # 2026-10-03 recorded decisions correctly but never rebuilt the site —
+    # "Build and deploy site" had only ever run once, from the very first
+    # manual push, before this fix.)
+    uses: ./.github/workflows/pages.yml
+    permissions:
+      contents: read
+      pages: write
+      id-token: write

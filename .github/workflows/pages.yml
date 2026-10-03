@@ -10,6 +10,13 @@ on:
       - "data/**"
       - "topics/**/profile.yaml"
   workflow_dispatch: {}
+  workflow_call: {}
+  # NOTE: a push made with the default GITHUB_TOKEN (as harvest.yml and
+  # publish.yml's own commits are) deliberately does NOT trigger other
+  # workflows' `on: push` — GitHub's anti-recursion protection. So the
+  # `push` trigger above only ever fires for a human-authored push (e.g.
+  # a template change pushed via GitHub Desktop). publish.yml calls this
+  # workflow directly via `workflow_call` instead of relying on push.
 
 permissions:
   contents: read

@@ -143,6 +143,14 @@ brief, and why.
 | Pilot topic / cadence | **CBDCs, monthly** | CBDCs stays the pilot through all phases per the brief; cadence set to monthly rather than weekly to keep the review load light while the engine is still being built. |
 | Existing Google Alerts | **None to import** | Wizard starts clean; no dedupe-against-existing-alerts step needed. |
 
+**2026-10-03, after seeing the first real review issues:**
+
+| Decision | Choice | Why |
+| --- | --- | --- |
+| Site search | **Client-side, JSON-index-driven** (`site/static/topic.js` + per-topic `items.json`) | Kevin has said before that a non-searchable interface isn't usable for him ([[kevin-prefers-built-not-instructed]] in memory). Matches the build brief's "client-side full-text search" Presentation requirement, which Phase 1 had skipped. No server needed — fits the static-site design. |
+| Monthly view | **Client-side toggle on the same page**, not separate pre-rendered monthly pages | Kevin wants to view publications by month as well as the full archive. A JS toggle (grouping the same `items.json` by `date`'s year-month) does both without doubling the number of generated pages or losing search/filter state when switching views. |
+| Quality tiers (high/medium/low) | **AI-judged per item, NOT from journal prestige/h-index/citations** | Kevin was explicit: favor empirical work with real evidence (esp. case studies) and strong theoretical/conceptual contributions; hold "systematic reviews"/"literature reviews" to a high bar by default; and actively value heterodox, anti-systemic and Global South political economy work rather than penalizing it for being unfamiliar or non-mainstream. Implemented as a rubric in `score.py`'s AI prompt, with `registry/quality_signals.yaml` supplying a list of known-rigorous heterodox/Global South sources as positive context — deliberately asymmetric (no equivalent "mainstream prestige" list), since adding one would just reproduce the Eurocentric bias this exists to counter. |
+
 ## Open questions (not blocking Phase 0/1, revisit before Phase 2)
 
 - Which publishers to watch for books (needed before the publisher-feed
@@ -325,6 +333,37 @@ part of the same 322-candidate run. Not re-harvesting again before those
 are reviewed, to avoid opening redundant duplicate issues for the same
 undecided items.
 
+**Kevin closed both issues (2026-10-03): a fourth real bug, found by
+actually checking rather than assuming the chain worked.** `Publish
+review` ran and succeeded for both (`data/decisions/cbdc.jsonl` has the
+real 219-accepted/103-rejected result), but `Build and deploy site` never
+ran again after the very first manual push — checked the Actions tab
+directly rather than taking the green "Publish review" checks as proof
+the site was live. **Root cause: a push made with the default
+`GITHUB_TOKEN` (as every commit `harvest.yml`/`publish.yml` make) does not
+trigger other workflows' `on: push` — GitHub's anti-recursion
+protection.** `pages.yml` was only ever reachable by a human-authored push
+or manual dispatch, so every harvest/publish commit silently failed to
+rebuild the live site. Fixed by adding `workflow_call` to `pages.yml` and
+having `publish.yml` call it directly (`uses: ./.github/workflows/
+pages.yml`) right after committing decisions, instead of relying on the
+push trigger at all. Rebuilt the site locally with Kevin's real 219
+accepted items to confirm the new site (search/quality-filter/monthly-view
+included — see the decisions table above) renders correctly against real
+data before pushing; not yet confirmed via the actual workflow run.
+
+**Also added, same session, before pushing:** quality tiers
+(high/medium/low, AI-judged per the rubric in `score.py`, fed by
+`registry/quality_signals.yaml`), a monthly view toggle, and client-side
+search — see the decisions table above for why each exists. These extend
+the review-issue comment encoding (now `<!--id:...;quality:...;
+relevance:...;tags:...-->`) and `DecisionStore.record()` (now also stores
+quality/relevance/tags) so quality survives from the AI scorer through the
+issue, into the decision record, onto the site. Both of Kevin's real
+closed issues predate this — their 219 accepted items show as "Unscored"
+on the site, which is correct (they really weren't AI-scored, since that
+run hit the TAGGER_MODEL bug), not a bug in the new code.
+
 ## Known limitations
 
 - `dedupe.py`'s `work_key()` can't version-merge items whose title is
@@ -359,20 +398,27 @@ undecided items.
 6. ~~Re-run `Harvest` (3rd try)~~ — opened two real review issues (#1, #2);
    also hit the stale-file bug and the empty-`TAGGER_MODEL` bug, both
    above. Both fixed, not yet pushed.
-7. Push this commit (same GitHub Desktop step — no stored git credential
-   on this machine, so every push needs it).
-8. Kevin reviews and closes
-   [issue #1](https://github.com/kevinpdonovan/topic-monitor/issues/1) and
-   [#2](https://github.com/kevinpdonovan/topic-monitor/issues/2) — the real
-   first review, whenever he's ready. (Don't re-run `Harvest` before then —
-   it would just open redundant issues for the same undecided items.)
-9. Once both are closed: confirm `Publish review` fired for each (Actions
-   tab → green check, and `data/decisions/cbdc.jsonl` has a new commit per
-   close) and `Build and deploy site` fired after — then open the live
-   Pages URL (Settings → Pages, or the `deploy` job's output in that
-   workflow run) and check the CBDC topic page shows the accepted items
-   and the health page shows real source status.
-10. Separately, worth one more `Harvest` run (after the above, so it
-    doesn't create duplicate issues) just to confirm AI scoring actually
-    completes now that both bugs blocking it are fixed — the three runs so
-    far have each hit a new reason it didn't run, never confirmed it works.
+7. ~~Push~~ — done (`4ba7d0f`).
+8. ~~Kevin reviews and closes issues #1 and #2~~ — done, 2026-10-03: 219
+   accepted, 103 rejected. `Publish review` succeeded for both (checked
+   the Actions tab directly, not assumed).
+9. ~~Confirm `Build and deploy site` fired after `Publish review`~~ — it
+   didn't: found the `GITHUB_TOKEN`-push-doesn't-trigger-workflows bug
+   (above). Fixed (`publish.yml` now calls `pages.yml` directly via
+   `workflow_call`); not yet confirmed via an actual workflow run, only by
+   rebuilding the site locally against Kevin's real 219 accepted items.
+10. Also added, same session: quality tiers, monthly view, client-side
+    search (see the 2026-10-03 decisions table above). Not yet pushed.
+11. Push this commit (same GitHub Desktop step — no stored git credential
+    on this machine, so every push needs it).
+12. Confirm live: open the Pages URL (Settings → Pages) and check the CBDC
+    topic page — 219 items, search box, quality filter, month/all-time
+    toggle all present and working — and that `Build and deploy site`
+    shows a real run in the Actions tab (not just the one from the very
+    first push).
+13. Worth one more `Harvest` run (after #12, so it doesn't create
+    duplicate issues for the 103 undecided — wait, those are already
+    *rejected*, so a re-run is safe either way, see `decided_ids()`) to
+    confirm AI scoring actually completes end-to-end now, and that the new
+    quality tiers show up for real on freshly-reviewed items, not just
+    synthetic test data.

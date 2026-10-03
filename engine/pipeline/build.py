@@ -1,8 +1,14 @@
 """Render the static site from data/ into site/_build/ (gitignored — built
 fresh by the Pages workflow each run, same as both reference repos).
+
+Each topic page is server-rendered (works with no JS: all accepted items,
+grouped by type) *and* ships an items.json the page's own JS reads to add
+search, a quality-tier filter, and an all-time/by-month view toggle — see
+site/static/topic.js. Added 2026-10-03 at Kevin's request.
 """
 from __future__ import annotations
 
+import json
 import shutil
 from pathlib import Path
 
@@ -38,9 +44,42 @@ def _topic_items(slug: str, corpus: Corpus) -> list:
             continue
         item = dict(item)
         item["featured"] = decision.get("featured", False)
+        item["quality"] = decision.get("quality")
+        item["relevance"] = decision.get("relevance")
+        item["tags"] = decision.get("tags", [])
         items.append(item)
     items.sort(key=lambda it: it.get("date") or "", reverse=True)
     return items
+
+
+def _month_key(item: dict) -> str:
+    date = item.get("date") or ""
+    return date[:7] if len(date) >= 7 else "undated"
+
+
+def _items_json(items: list) -> str:
+    """Flat JSON index for the topic page's client-side search/filter/
+    monthly-view JS (site/static/topic.js) — see module docstring."""
+    rows = [
+        {
+            "id": it["id"],
+            "title": it["title"],
+            "url": it.get("url") or it.get("pdf_url") or "",
+            "authors": it.get("authors") or [],
+            "organisation": it.get("organisation", ""),
+            "venue": it.get("venue", ""),
+            "date": it.get("date", ""),
+            "month": _month_key(it),
+            "source_type": it.get("source_type", "article"),
+            "quality": it.get("quality"),
+            "relevance": it.get("relevance"),
+            "tags": it.get("tags") or [],
+            "featured": bool(it.get("featured")),
+            "abstract": (it.get("abstract") or "")[:400],
+        }
+        for it in items
+    ]
+    return json.dumps(rows, ensure_ascii=False)
 
 
 def build() -> dict:
@@ -79,6 +118,7 @@ def build() -> dict:
             groups.setdefault(item.get("source_type", "article"), []).append(item)
         topic_dir = OUT_DIR / slug
         topic_dir.mkdir(parents=True, exist_ok=True)
+        (topic_dir / "items.json").write_text(_items_json(items), encoding="utf-8")
         (topic_dir / "index.html").write_text(
             topic_tmpl.render(
                 root="../",

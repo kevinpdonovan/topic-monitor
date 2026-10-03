@@ -10,7 +10,9 @@ def test_issue_body_and_parse_review_roundtrip():
         make_item(title="A relevant CBDC report", source_type="report", connector="worldbank", url="https://wb.org/r"),
     ]
     items[0]["_ai_relevance"] = 3
+    items[0]["_ai_quality"] = "high"
     items[0]["_ai_reason"] = "central to the topic"
+    items[0]["_ai_tags"] = ["cbdc", "wholesale"]
     items[1]["_gate"] = {"passed": True, "matched_terms": ["cbdc", "digital"], "reason": "matched"}
 
     body = issue_body(items, PROFILE, run_label="2026-10")
@@ -24,6 +26,25 @@ def test_issue_body_and_parse_review_roundtrip():
     assert items[1]["id"] in parsed["accepted"]
     assert items[0]["id"] in parsed["featured"]
     assert parsed["all"] == {items[0]["id"], items[1]["id"]}
+
+    # Quality/relevance/tags round-trip through the HTML comment for the
+    # scored item; the gate-only item (never AI-scored) comes back empty,
+    # not a wrong guess.
+    assert parsed["meta"][items[0]["id"]] == {"quality": "high", "relevance": 3, "tags": ["cbdc", "wholesale"]}
+    assert parsed["meta"][items[1]["id"]] == {"quality": None, "relevance": None, "tags": []}
+
+
+def test_review_roundtrip_handles_hyphenated_tags():
+    # Regression guard: tags like "e-cny" or "cross-border" contain hyphens,
+    # so the comment's tags segment must be matched non-greedily up to the
+    # literal "-->", not with a naive [^-]* that would truncate early.
+    item = make_item(title="e-CNY cross-border pilot", source_type="news", connector="rss", url="https://x.com/1")
+    item["_ai_relevance"] = 2
+    item["_ai_quality"] = "medium"
+    item["_ai_tags"] = ["e-cny", "cross-border"]
+    body = issue_body([item], PROFILE, run_label="2026-10")
+    parsed = parse_review(body)
+    assert parsed["meta"][item["id"]]["tags"] == ["e-cny", "cross-border"]
 
 
 def test_parse_review_respects_manual_unticking():

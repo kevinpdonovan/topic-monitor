@@ -7,6 +7,9 @@
   --accent: #7a4f2b;
   --ok: #2d6a3e;
   --fail: #a4342a;
+  --quality-high: #2d6a3e;
+  --quality-medium: #8a6a1f;
+  --quality-low: #8a4a2f;
 }
 @media (prefers-color-scheme: dark) {
   :root {
@@ -17,6 +20,9 @@
     --accent: #c9986a;
     --ok: #6fbf7f;
     --fail: #e08177;
+    --quality-high: #6fbf7f;
+    --quality-medium: #d4ac4e;
+    --quality-low: #d4885e;
   }
 }
 * { box-sizing: border-box; }
@@ -40,6 +46,21 @@ ul.items li a.title { font-weight: 600; color: var(--fg); text-decoration: none;
 ul.items li a.title:hover { text-decoration: underline; }
 .meta { color: var(--muted); font-size: 0.85rem; }
 .badge { display: inline-block; font-size: 0.75rem; padding: 0.1rem 0.4rem; border: 1px solid var(--line); border-radius: 4px; margin-left: 0.4rem; color: var(--muted); }
+.badge.quality-high { color: var(--quality-high); border-color: var(--quality-high); }
+.badge.quality-medium { color: var(--quality-medium); border-color: var(--quality-medium); }
+.badge.quality-low { color: var(--quality-low); border-color: var(--quality-low); }
+.badge.quality-unscored { border-style: dashed; }
+.badge.featured { color: var(--accent); border-color: var(--accent); }
+.month-heading { margin-top: 2.5rem; }
+
+#controls { margin: 1rem 0 0.5rem; padding: 0.9rem 1rem; border: 1px solid var(--line); border-radius: 8px; }
+#search-input { width: 100%; padding: 0.5rem 0.6rem; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); font-size: 0.95rem; }
+.quality-filter { display: flex; flex-wrap: wrap; gap: 0.9rem; margin-top: 0.7rem; font-size: 0.9rem; }
+.quality-filter label { display: flex; align-items: center; gap: 0.3rem; cursor: pointer; }
+.view-toggle { margin-top: 0.7rem; display: flex; gap: 0.4rem; }
+.view-toggle button { padding: 0.3rem 0.7rem; border: 1px solid var(--line); border-radius: 6px; background: transparent; color: var(--muted); font-size: 0.85rem; cursor: pointer; }
+.view-toggle button.active { color: var(--bg); background: var(--accent); border-color: var(--accent); }
+#result-count { margin: 0.6rem 0 0; }
 table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
 th, td { text-align: left; padding: 0.4rem 0.6rem; border-bottom: 1px solid var(--line); font-size: 0.9rem; }
 th { color: var(--muted); font-weight: 600; }

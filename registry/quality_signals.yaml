@@ -1,0 +1,41 @@
+# Signals fed into the AI quality-rating prompt (engine/pipeline/score.py).
+#
+# Purpose: counteract the model's own training-data bias toward
+# Global-North/mainstream-prestige sources, by explicitly naming known-
+# rigorous heterodox political economy and Global South institutions, so
+# they are not under-rated simply for being less familiar or less
+# "prestigious" in the conventional sense. This is a recognition list for
+# context, not a gatekeeping one — a source absent from this list is
+# judged on the substance of the item itself, not penalized for the
+# absence.
+#
+# Deliberately asymmetric: there is no equivalent "mainstream prestige"
+# boost list here. Kevin's instruction (2026-10-03) was explicit: quality
+# should not be inferred from journal prestige, h-index, or citation
+# counts, and mainstream Global-North venues are already the model's
+# default assumption of rigor — adding a boost list for them would
+# reproduce exactly the bias this file exists to counter.
+
+heterodox_and_global_south_sources:
+  - "Tricontinental: Institute for Social Research"
+  - "CODESRIA (Council for the Development of Social Science Research in Africa)"
+  - "Third World Network"
+  - "South Centre"
+  - "Review of African Political Economy (ROAPE)"
+  - "Economic and Political Weekly"
+  - "Alternatives Sud / CETRI"
+  - "Transnational Institute (TNI)"
+  - "Journal of World-Systems Research"
+  - "Review (Fernand Braudel Center)"
+  - "International Development Economics Associates (IDEAs)"
+  - "DAWN (Development Alternatives with Women for a New Era)"
+  - "CEPAL / ECLAC (UN Economic Commission for Latin America and the Caribbean)"
+  - "Journal of Peasant Studies"
+  - "Agrarian South: Journal of Political Economy"
+  - "Africa Development"
+  - "Pambazuka News"
+  - "Monthly Review"
+  - "Historical Materialism"
+  - "Global Development Policy Center (Boston University)"
+  - "Jawaharlal Nehru University Centre for Economic Studies and Planning"
+  - "Southern Centre for Inequality Studies"
