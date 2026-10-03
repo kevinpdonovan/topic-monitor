@@ -1,0 +1,82 @@
+name: Backfill
+
+on:
+  workflow_dispatch:
+    inputs:
+      topic:
+        description: "Topic slug to backfill (e.g. cbdc)"
+        required: true
+      years_back:
+        description: "How many years back to pull"
+        required: true
+        default: "1"
+      max_pages:
+        description: "OpenAlex pages per query (50 items/page)"
+        required: true
+        default: "20"
+      grace_period_days:
+        description: "Items this recent always pass the citation pre-filter"
+        required: true
+        default: "90"
+      citations_per_month:
+        description: "Required citations grow by this much per month beyond the grace period"
+        required: true
+        default: "1.0"
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: pip install -r requirements.txt
+
+      - name: Backfill
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          CONTACT_EMAIL: ${{ vars.CONTACT_EMAIL }}
+          TAGGER_MODEL: ${{ vars.TAGGER_MODEL }}
+        run: |
+          python -m engine backfill \
+            --topic "${{ inputs.topic }}" \
+            --years-back "${{ inputs.years_back }}" \
+            --max-pages "${{ inputs.max_pages }}" \
+            --grace-period-days "${{ inputs.grace_period_days }}" \
+            --citations-per-month "${{ inputs.citations_per_month }}"
+
+      - name: Commit backfilled data
+        run: |
+          git config user.name "topic-monitor-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add data/ topics/*/review/
+          git diff --staged --quiet || git commit -m "Backfill ${{ inputs.topic }} (${{ inputs.years_back }}y back)"
+          git push
+
+      - name: Open a review issue per topic
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh label create review --color FEF2C0 2>/dev/null || true
+          gh label create backfill --color 5319E7 2>/dev/null || true
+          for review_file in topics/*/review/*.md; do
+            [ -e "$review_file" ] || continue
+            slug=$(echo "$review_file" | cut -d/ -f2)
+            title=$(yq -r '.title' "topics/$slug/profile.yaml" 2>/dev/null || echo "$slug")
+            run_label=$(basename "$review_file" .md)
+            gh label create "topic:$slug" --color 1D76DB 2>/dev/null || true
+            gh issue create \
+              --title "$title backfill review — $run_label" \
+              --label review \
+              --label backfill \
+              --label "topic:$slug" \
+              --body-file "$review_file"
+          done

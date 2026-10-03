@@ -1,8 +1,12 @@
-"""CLI entry points: harvest, publish, build.
+"""CLI entry points: harvest, backfill, publish, build.
 
 `python -m engine harvest` — run connectors once for the union of every
 active topic's queries, score against each topic, write a review-issue
 markdown file per topic for the Action to open as a GitHub issue.
+
+`python -m engine backfill --topic X --years-back N` — one-time historical
+pull further back than the regular 12-month window, scholarship only (see
+engine/pipeline/backfill.py for why). Not part of the regular cadence.
 
 `python -m engine publish --topic X --issue-body-file F --run R` — parse a
 closed review issue back into decisions, update the corpus, rebuild the site.
@@ -21,6 +25,12 @@ from engine.connectors.gdelt import harvest_gdelt
 from engine.connectors.openalex import harvest_openalex
 from engine.connectors.rss import harvest_rss
 from engine.pipeline import build as build_mod
+from engine.pipeline.backfill import (
+    DEFAULT_CITATIONS_PER_MONTH,
+    DEFAULT_GRACE_PERIOD_DAYS,
+    backfill_date_from,
+    run_citation_prefilter,
+)
 from engine.pipeline.corpus import Corpus, DecisionStore
 from engine.pipeline.dedupe import dedupe
 from engine.pipeline.health import aggregate_health, load_health, save_health
@@ -33,6 +43,29 @@ DATA_DIR = REPO_ROOT / "data"
 
 def _run_label(cadence_hint: str = "") -> str:
     return date.today().isoformat()
+
+
+def _clear_review_dir(slug: str) -> Path:
+    """See the long comment in cmd_harvest for why this must run
+    unconditionally, before any check for whether there's anything new to
+    write — a real bug (2026-10-03) came from skipping it when there wasn't."""
+    review_dir = REPO_ROOT / "topics" / slug / "review"
+    review_dir.mkdir(parents=True, exist_ok=True)
+    for stale in review_dir.glob("*.md"):
+        stale.unlink()
+    return review_dir
+
+
+def _write_review_files(slug: str, profile: dict, candidates: list, run_label: str, review_dir: Path) -> None:
+    if not candidates:
+        print(f"{slug}: 0 candidates, no review file written")
+        return
+    parts = issue_bodies(candidates, profile, run_label=run_label)
+    for i, (_suffix, body) in enumerate(parts, start=1):
+        review_path = review_dir / (f"{run_label}.md" if len(parts) == 1 else f"{run_label}-part{i}.md")
+        review_path.write_text(body, encoding="utf-8")
+        print(f"{slug}: {len(candidates)} candidates -> {review_path.relative_to(REPO_ROOT)}"
+              + (f" (part {i}/{len(parts)})" if len(parts) > 1 else ""))
 
 
 def cmd_harvest(args) -> int:
@@ -137,21 +170,8 @@ def cmd_harvest(args) -> int:
         #     the next run's issue-creation step re-opened them as
         #     duplicate issues (#3, #4, closed as duplicates of #1/#2).
         #     Fix: clear unconditionally, before the candidates check.
-        review_dir = REPO_ROOT / "topics" / slug / "review"
-        review_dir.mkdir(parents=True, exist_ok=True)
-        for stale in review_dir.glob("*.md"):
-            stale.unlink()
-
-        if not candidates:
-            print(f"{slug}: 0 new candidates, no review file written")
-            continue
-
-        parts = issue_bodies(candidates, profile, run_label=run_label)
-        for i, (_suffix, body) in enumerate(parts, start=1):
-            review_path = review_dir / (f"{run_label}.md" if len(parts) == 1 else f"{run_label}-part{i}.md")
-            review_path.write_text(body, encoding="utf-8")
-            print(f"{slug}: {len(candidates)} candidates -> {review_path.relative_to(REPO_ROOT)}"
-                  + (f" (part {i}/{len(parts)})" if len(parts) > 1 else ""))
+        review_dir = _clear_review_dir(slug)
+        _write_review_files(slug, profile, candidates, run_label, review_dir)
 
     corpus.save()
 
@@ -161,6 +181,80 @@ def cmd_harvest(args) -> int:
     save_health(DATA_DIR / "health" / "latest.json", health_doc)
     print(f"health: {health_doc['stats']['sources_ok']}/{health_doc['stats']['sources_total']} sources ok, "
           f"{health_doc['stats']['items_total']} items total")
+    return 0
+
+
+def cmd_backfill(args) -> int:
+    """One-time historical pull for a single topic, further back than the
+    regular 12-month window. Scholarship only (OpenAlex) — see
+    engine/pipeline/backfill.py for why, and for the age-weighted citation
+    pre-filter this applies before AI scoring to keep a multi-year pull
+    tractable without penalizing recent work for not having citations yet.
+    """
+    profile = load_profile(args.topic)
+    contact_email = os.environ.get("CONTACT_EMAIL", "")
+    if not contact_email:
+        print("CONTACT_EMAIL not set — required for the OpenAlex polite pool", file=sys.stderr)
+        return 1
+
+    queries = (profile.get("connectors", {}).get("openalex", {}) or {}).get("queries", [])
+    if not queries:
+        print(f"{args.topic}: no connectors.openalex.queries configured, nothing to backfill", file=sys.stderr)
+        return 1
+
+    today = date.today()
+    date_from = backfill_date_from(args.years_back, today=today)
+    run_label = f"backfill-{args.years_back}y-{today.isoformat()}"
+    print(f"backfilling {args.topic} from {date_from} ({args.years_back} year(s) back, max {args.max_pages} pages/query)")
+
+    items, health = harvest_openalex(
+        queries, contact_email=contact_email, date_from=date_from, max_pages=args.max_pages
+    )
+    print(f"harvested {len(items)} raw items")
+
+    corpus = Corpus(DATA_DIR / "items.jsonl")
+    result = dedupe(items)
+    deduped = result["items"]
+    print(f"-> {len(deduped)} after dedupe (rate {result['stats']['duplicate_rate']:.1%})")
+
+    decisions = DecisionStore(DATA_DIR / "decisions" / f"{args.topic}.jsonl")
+    already_decided = decisions.decided_ids()
+    survivors, _rejected = run_keyword_gate(deduped, profile)
+    candidates = [it for it in survivors if it["id"] not in already_decided]
+    print(f"-> {len(candidates)} pass the keyword gate and aren't already decided")
+
+    candidates, dropped = run_citation_prefilter(
+        candidates, today=today, grace_period_days=args.grace_period_days, citations_per_month=args.citations_per_month
+    )
+    print(f"-> {len(candidates)} pass the age-weighted citation pre-filter ({len(dropped)} dropped)")
+    for it in candidates:
+        it["origin"] = sorted(set(it.get("origin", [])) | {args.topic})
+
+    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+    tagger_model = os.environ.get("TAGGER_MODEL") or "claude-haiku-4-5"
+    scored = ai_score(candidates, profile, api_key=api_key, model=tagger_model)
+    health.append(scored["health"])
+    for it in candidates:
+        s = scored["scores"].get(it["id"])
+        if s:
+            it["_ai_relevance"] = s["relevance"]
+            it["_ai_quality"] = s["quality"]
+            it["_ai_reason"] = s["reason"]
+            it["_ai_tags"] = s.get("tags", [])
+
+    for it in deduped:
+        corpus.upsert(it)
+    corpus.save()
+
+    review_dir = _clear_review_dir(args.topic)
+    _write_review_files(args.topic, profile, candidates, run_label, review_dir)
+
+    # Dated health file only — never overwrite data/health/latest.json
+    # here. latest.json is what the site's health page shows as current
+    # source status; a backfill only touches OpenAlex, so writing it there
+    # would make GDELT/RSS look like they'd vanished rather than just not
+    # being part of this run.
+    save_health(DATA_DIR / "health" / f"{run_label}.json", aggregate_health(health, previous=None, run_label=run_label))
     return 0
 
 
@@ -200,6 +294,16 @@ def main(argv=None) -> int:
     p_harvest.add_argument("--topic", help="harvest only this topic (default: all active topics)")
     p_harvest.add_argument("--skip-gdelt", action="store_true", help="skip GDELT (useful while rate-limited)")
     p_harvest.set_defaults(func=cmd_harvest)
+
+    p_backfill = sub.add_parser("backfill", help="one-time historical pull beyond the normal 12-month window (scholarship only)")
+    p_backfill.add_argument("--topic", required=True)
+    p_backfill.add_argument("--years-back", type=int, default=1, help="how far back to pull (default: 1 year)")
+    p_backfill.add_argument("--max-pages", type=int, default=20, help="OpenAlex pages per query, 50 items/page (default: 20)")
+    p_backfill.add_argument("--grace-period-days", type=int, default=DEFAULT_GRACE_PERIOD_DAYS,
+                             help=f"items this recent always pass the citation pre-filter regardless of citations (default: {DEFAULT_GRACE_PERIOD_DAYS})")
+    p_backfill.add_argument("--citations-per-month", type=float, default=DEFAULT_CITATIONS_PER_MONTH,
+                             help=f"required citations grow by this much per month beyond the grace period (default: {DEFAULT_CITATIONS_PER_MONTH})")
+    p_backfill.set_defaults(func=cmd_backfill)
 
     p_publish = sub.add_parser("publish", help="parse a closed review issue into decisions, rebuild the site")
     p_publish.add_argument("--topic", required=True)

@@ -150,6 +150,7 @@ brief, and why.
 | Site search | **Client-side, JSON-index-driven** (`site/static/topic.js` + per-topic `items.json`) | Kevin has said before that a non-searchable interface isn't usable for him ([[kevin-prefers-built-not-instructed]] in memory). Matches the build brief's "client-side full-text search" Presentation requirement, which Phase 1 had skipped. No server needed — fits the static-site design. |
 | Monthly view | **Client-side toggle on the same page**, not separate pre-rendered monthly pages | Kevin wants to view publications by month as well as the full archive. A JS toggle (grouping the same `items.json` by `date`'s year-month) does both without doubling the number of generated pages or losing search/filter state when switching views. |
 | Quality tiers (high/medium/low) | **AI-judged per item, NOT from journal prestige/h-index/citations** | Kevin was explicit: favor empirical work with real evidence (esp. case studies) and strong theoretical/conceptual contributions; hold "systematic reviews"/"literature reviews" to a high bar by default; and actively value heterodox, anti-systemic and Global South political economy work rather than penalizing it for being unfamiliar or non-mainstream. Implemented as a rubric in `score.py`'s AI prompt, with `registry/quality_signals.yaml` supplying a list of known-rigorous heterodox/Global South sources as positive context — deliberately asymmetric (no equivalent "mainstream prestige" list), since adding one would just reproduce the Eurocentric bias this exists to counter. |
+| Historical backfill | **One-time, manually-triggered, scholarship-only, age-weighted citation pre-filter, start at 1 year back** | Kevin wants to pull further back than the regular 12-month window, winnowed so an old uncited piece doesn't make the cut but a recent one isn't held to the same citation bar (it hasn't had time to accumulate any). `engine/pipeline/backfill.py`'s `min_citations_for_age()` gives a grace period (default 90 days, always passes regardless of citations) then requires linearly more citations per month beyond it — explicitly a volume-reduction step before the same AI quality rubric runs, not a quality judgment itself (a flat citation cutoff would reproduce exactly the recency bias the quality-tier design above was built to avoid). GDELT/RSS have no multi-year history via their feeds, so this is OpenAlex-only. Started at 1 year back per Kevin's instruction, not the 5 he first floated — `--years-back` is a CLI/workflow parameter, trivial to push further once the 1-year run's output has been sanity-checked. |
 
 ## Open questions (not blocking Phase 0/1, revisit before Phase 2)
 
@@ -443,7 +444,7 @@ clear, then decide whether to write," not "clear only when writing."
     files in place, and they got re-opened as duplicate issues (#3, #4).
     Closed both as duplicates of #1/#2 with an explanation. Fixed
     properly: the clear is now unconditional. Not yet pushed.
-12. Push this commit.
+12. ~~Push this commit~~ — done (`cd5f39b`).
 13. Still outstanding: confirm AI scoring produces real relevance/quality
     scores on a run with actual new candidates — every run so far has
     either hit a bug before reaching it, or found ~nothing new to score.
@@ -453,3 +454,10 @@ clear, then decide whether to write," not "clear only when writing."
     `workflow_dispatch` runs going forward — each one hits live rate
     limits for real and leaves evidence (duplicate issues, in this case)
     if a bug's still lurking in the empty-candidates path.
+14. Added `backfill.yml` + `python -m engine backfill` (same session): a
+    one-time, manually-triggered, OpenAlex-only historical pull with the
+    age-weighted citation pre-filter (see decisions table above). Not yet
+    run for real — next step is pushing this and triggering it by hand
+    (`--topic cbdc --years-back 1`, GitHub's default inputs match that)
+    once OpenAlex's rate limit from today's repeated testing has cleared,
+    same caution as #13.
