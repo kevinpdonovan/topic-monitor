@@ -3,13 +3,18 @@ then syndicated-news clustering.
 
 Ported from insubordinate-terminal/soft-currency-observatory's dedupe.py
 (near-identical in both — see CLAUDE.md). One change: work_key() is now
-computed unconditionally for every item before merge_versions runs, and
-merge_versions asserts that. The reference repos' bug (reproduced directly
-in insubordinate-terminal/data/runs/2026-W40/candidates.json: two Zenodo
-copies of the same work, both *missing* work_key, reached the review queue
-as separate checkboxes) was exactly a case where some code path skipped
-assigning work_key before the merge step read it. Computing it here, always,
-removes that whole class of bug rather than patching the one call site.
+computed unconditionally for every item before merge_versions runs, instead
+of some code path being able to skip assigning it. The reference repos' bug
+(reproduced directly in insubordinate-terminal/data/runs/2026-W40/
+candidates.json: two Zenodo copies of the same work, both *missing*
+work_key, reached the review queue as separate checkboxes) was exactly that
+— a code path that should have set work_key and silently didn't. Computing
+it here, always, removes that whole class of bug rather than patching the
+one call site. (An earlier version of this fix added an assert that
+work_key() was always non-empty for a titled item — that turned out to be
+wrong, not just defensive: a non-Latin-script title legitimately produces
+no tokens under this module's ASCII-only tokenizer, and the assert crashed
+the first live harvest run on exactly that case. See merge_versions().)
 """
 from __future__ import annotations
 
@@ -79,12 +84,21 @@ def _merge_into(primary: dict, extra: dict) -> dict:
 
 
 def merge_versions(items: list) -> tuple:
-    """Collapse same-work different-DOI/URL duplicates. Returns (kept, n_merged)."""
+    """Collapse same-work different-DOI/URL duplicates. Returns (kept, n_merged).
+
+    An item whose title tokenizes to nothing (title_tokens() uses an
+    ASCII-only regex, so a title entirely in a non-Latin script — e.g. a
+    Chinese-language e-CNY paper — has no tokens) falls through to
+    `singles` below rather than being dropped or raising: it just can't be
+    version-merged by this heuristic, which is a real limitation (found
+    live, 2026-10-03, on the first production harvest run) but not a bug —
+    unlike the Zenodo gap this module exists to fix, there's no code path
+    here that *should* produce a work_key and silently doesn't.
+    """
     groups: dict = {}
     singles = []
     for item in items:
         wk = work_key(item)
-        assert wk or not item.get("title"), f"work_key() must be computable for item {item.get('id')}"
         if not wk:
             singles.append(item)
             continue

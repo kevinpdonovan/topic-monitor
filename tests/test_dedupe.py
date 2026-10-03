@@ -13,6 +13,18 @@ def test_work_key_is_always_computable_for_titled_items():
     assert work_key(item)
 
 
+def test_merge_versions_does_not_crash_on_a_non_latin_title():
+    # Regression test for a real failure on the first live harvest run
+    # (2026-10-03): a Chinese-language e-CNY paper's title tokenizes to
+    # nothing (title_tokens() is ASCII-only), so work_key() is legitimately
+    # empty for it. That must fall through to `singles`, not crash the run
+    # — an earlier version of this code had an assert that did exactly that.
+    item = make_item(title="数字人民币的设计与挑战", source_type="article", connector="openalex", doi="10.1/cny")
+    kept, merged_count = merge_versions([item])
+    assert merged_count == 0
+    assert kept == [item]
+
+
 def test_merge_versions_collapses_same_work_different_doi():
     a = make_item(
         title="BRICS and the transformation of the global political economy",

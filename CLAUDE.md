@@ -101,9 +101,14 @@ Confirmed by reading both repos directly (not assumed from the brief):
   contains two records of the same work (Zenodo DOIs `zenodo.22855615` /
   `...616`) that reached the review issue as two separate checkboxes,
   because both records are missing `work_key` entirely — a wiring gap, not
-  a Zenodo-specific one. The new pipeline's dedupe stage needs a test that
-  asserts every candidate item has a `work_key` before the merge step runs,
-  not just a happy-path test.
+  a Zenodo-specific one. The new pipeline's dedupe stage computes
+  `work_key()` unconditionally for every candidate before the merge step
+  runs, instead of leaving any code path able to skip it (a regression
+  test covers this). Note: an early version of this fix also *asserted*
+  that `work_key()` was non-empty for any titled item, which turned out to
+  be wrong rather than just extra-safe — it crashed the first live harvest
+  run on a Chinese-language title, since the tokenizer is ASCII-only. See
+  "Known limitations" below.
 - **Five near-duplicate modules with drift.** `dedupe.py` is close to
   line-for-line identical between the two repos (same `STOP` list, same
   functions), differing only in a field name (`section` vs `kind`).
@@ -217,23 +222,44 @@ real decision and shouldn't sit in the corpus as if it were one. The
 actual first run should happen for real via the harvest workflow once
 this is pushed, producing a real GitHub issue for Kevin to review by hand.
 
-**Not yet confirmed live:**
-  - GDELT: reachable (not blocked), but 429 rate-limited from this build
-    sandbox's egress IP on both attempts, each ~10s apart. The connector
-    implements the "one request at a time with backoff" lesson from
-    insubordinate-terminal's health.json, but needs a real run from the
-    GitHub Actions runner's IP (different network) to confirm it isn't
-    rate-limited there too.
-  - The RSS connector's `feedparser` parsing: code is written and
-    exercises real recorded fixtures in the test suite, but this sandbox's
-    Python (3.7) is too old to install `feedparser` or `anthropic`, so
-    `harvest_rss()` and `ai_score()` haven't executed end-to-end locally
-    — only unit-tested (the RSS test is `pytest.importorskip`-skipped
-    locally, not failing). Both need GitHub Actions' Python 3.12 to verify
-    for real.
-  - AI scoring: implemented and unit-tested for the "no key" path; the
-    real Claude API call path needs `ANTHROPIC_API_KEY` added as a repo
-    secret before it can run at all.
+**First live run on GitHub Actions (2026-10-03): failed, root-caused, fixed.**
+Kevin added `ANTHROPIC_API_KEY` and `CONTACT_EMAIL` as repo secrets/vars
+and ran the `Harvest` workflow by hand. It failed after 51s on real
+harvested data (not a config problem): `merge_versions()`'s defensive
+`assert wk or not item.get("title")` — added to guard against the Zenodo
+wiring gap above — fired on an item whose title is entirely
+non-Latin-script, where `title_tokens()`'s ASCII-only regex legitimately
+produces zero tokens. The assert was wrong, not just strict: the existing
+`if not wk: singles.append(item)` fallback already handled this case
+correctly, but never got to run. Fixed by removing the assert (see
+`dedupe.py` and "Known limitations" below); added a regression test
+(`test_merge_versions_does_not_crash_on_a_non_latin_title`). Separately,
+the first push's `Build and deploy site` run also failed — GitHub Pages
+wasn't enabled yet for this repo. Fixed directly in repo Settings → Pages
+→ Source: GitHub Actions (one-time setup, not a review decision, so done
+without asking).
+
+**Still not confirmed live, pending the re-run:**
+  - GDELT: reachable (not blocked) but 429 rate-limited from the build
+    sandbox's IP both times it was tried from there. Whether it's also
+    rate-limited from the Actions runner's IP is still unconfirmed — the
+    first live run never got far enough to show the GDELT health rows
+    before the dedupe crash above. Check the health page after the re-run.
+  - RSS and AI scoring: same — the crash happened after harvesting but
+    during dedupe, so health data exists for OpenAlex/GDELT/RSS connector
+    calls from that run, but the review-issue/scoring stage never ran.
+    Check the re-run's health page and the opened issue.
+
+## Known limitations
+
+- `dedupe.py`'s `work_key()` can't version-merge items whose title is
+  entirely non-Latin-script (Chinese, Japanese, Arabic, Cyrillic, ...) —
+  `title_tokens()` uses an ASCII-only regex. Such items just don't get
+  version-deduped (not a crash, not data loss — see `merge_versions()`),
+  which matters for this topic specifically: e-CNY/digital-yuan coverage
+  is exactly the kind of source likely to have Chinese-language titles.
+  Worth revisiting if the health/duplicate-rate data after a few runs
+  shows this losing real duplicates.
 
 **Not done, and intentionally deferred (see "What we're reusing" above):**
   - Real embedding-similarity as scoring stage 1, per the build brief's
@@ -247,14 +273,21 @@ this is pushed, producing a real GitHub issue for Kevin to review by hand.
 
 ## Next steps before Phase 1 is fully closed out
 
-1. Push this commit (same manual GitHub Desktop step as Phase 0 — no
-   stored git credential on this machine).
-2. In the repo's GitHub Settings, add: secret `ANTHROPIC_API_KEY`
-   (decided provider, not yet supplied), repo variable `CONTACT_EMAIL` =
-   kdonovan11@gmail.com, repo variable `TAGGER_MODEL` = claude-haiku-4-5
-   (or leave unset — the code defaults to it).
-3. Run the `Harvest` workflow by hand (workflow_dispatch) to get the real
-   first run — confirms GDELT/RSS/AI-scoring live, and opens the actual
-   first review issue on GitHub for Kevin to work through.
-4. Once that issue is closed, confirm `Publish review` and `Build and
-   deploy site` both fire correctly and the live Pages site looks right.
+1. ~~Push this commit~~ — done (Phase 1 commit `aac9e03`, pushed via
+   GitHub Desktop, same manual step as Phase 0 — no stored git credential
+   on this machine).
+2. ~~Add `ANTHROPIC_API_KEY` and `CONTACT_EMAIL`~~ — done by Kevin
+   (`TAGGER_MODEL` left unset, code defaults to `claude-haiku-4-5`).
+3. ~~Run `Harvest` by hand~~ — done, failed on the dedupe crash above.
+   Fix is written; needs a new commit pushed, then re-run.
+4. Push the dedupe fix (same GitHub Desktop step).
+5. Re-run `Harvest` (workflow_dispatch). Check its health output for
+   GDELT/RSS/AI-scoring status, and that it opens a real review issue.
+6. Kevin reviews and closes that issue.
+7. Confirm `Publish review` fired (Actions tab → green check, and
+   `data/decisions/cbdc.jsonl` has a new commit) and `Build and deploy
+   site` fired after it (triggered by the decisions-file push) — then open
+   the live Pages URL (shown in the repo's Settings → Pages, and as the
+   `deploy` job's output in that workflow run) and check the CBDC topic
+   page shows the accepted items and the health page shows real source
+   status.
