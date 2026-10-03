@@ -1,6 +1,6 @@
 {
   "run": "2026-10-03",
-  "run_at": "2026-10-03T09:38:49.427360+00:00",
+  "run_at": "2026-10-03T10:07:02.963695+00:00",
   "sources": [
     {
       "count": 150,
@@ -39,14 +39,14 @@
     },
     {
       "count": 0,
-      "fail_streak": 1,
+      "fail_streak": 2,
       "note": "HTTP 429 rate-limited",
       "ok": false,
       "source": "gdelt:central bank digital currency"
     },
     {
       "count": 0,
-      "fail_streak": 1,
+      "fail_streak": 2,
       "note": "HTTP 429 rate-limited",
       "ok": false,
       "source": "gdelt:CBDC pilot"
@@ -95,8 +95,8 @@
     },
     {
       "count": 0,
-      "fail_streak": 1,
-      "note": "Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'This API key is not scoped to a workspace, so this request must include the anthropic-workspace-id header with the ID of the workspace to use. Add the header, or use an API key that is scoped to a workspace.'}, 'request_id': None}",
+      "fail_streak": 2,
+      "note": "Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'model: String should have at least 1 character'}, 'request_id': 'req_011Cff7nq4xRr1oaunGXZE2p'}",
       "ok": false,
       "source": "ai_score"
     }
