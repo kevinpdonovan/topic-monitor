@@ -364,6 +364,28 @@ closed issues predate this — their 219 accepted items show as "Unscored"
 on the site, which is correct (they really weren't AI-scored, since that
 run hit the TAGGER_MODEL bug), not a bug in the new code.
 
+**Fifth live run (2026-10-03, confirming the above): a fifth real bug,
+caused directly by re-running `Harvest` for testing rather than waiting
+for the next real cycle.** This run found almost no new candidates
+(OpenAlex itself got 429-rate-limited this time, from re-running harvest
+four times today against the same IP — not a bug, just a side effect of
+testing cadence) and recorded `ai_score: ok=true, count=0` — the
+workspace-scoping and TAGGER_MODEL bugs are both confirmed actually fixed
+now, there was just nothing new to score. But because `candidates` came
+back empty, the first-pass fix above (clear old review files before
+writing new ones) never ran — it was gated behind the same `if not
+candidates` check it needed to run ahead of. The stale, already-published
+`part1.md`/`part2.md` from the prior run were still sitting in
+`topics/cbdc/review/`, and `harvest.yml`'s blind `*.md` glob re-opened
+them as issues **#3 and #4 — duplicates of the already-closed, already-
+published #1 and #2.** Caught by checking the Issues tab directly rather
+than assuming "Harvest succeeded" meant everything downstream was fine;
+closed both as duplicates (with a comment explaining why) before they
+could confuse Kevin or get acted on. Fixed properly this time: the
+review-directory clear now happens unconditionally, before the
+candidates check, not after it (`cli.py`) — the right fix is "always
+clear, then decide whether to write," not "clear only when writing."
+
 ## Known limitations
 
 - `dedupe.py`'s `work_key()` can't version-merge items whose title is
@@ -407,18 +429,27 @@ run hit the TAGGER_MODEL bug), not a bug in the new code.
    (above). Fixed (`publish.yml` now calls `pages.yml` directly via
    `workflow_call`); not yet confirmed via an actual workflow run, only by
    rebuilding the site locally against Kevin's real 219 accepted items.
-10. Also added, same session: quality tiers, monthly view, client-side
-    search (see the 2026-10-03 decisions table above). Not yet pushed.
-11. Push this commit (same GitHub Desktop step — no stored git credential
-    on this machine, so every push needs it).
-12. Confirm live: open the Pages URL (Settings → Pages) and check the CBDC
-    topic page — 219 items, search box, quality filter, month/all-time
-    toggle all present and working — and that `Build and deploy site`
-    shows a real run in the Actions tab (not just the one from the very
-    first push).
-13. Worth one more `Harvest` run (after #12, so it doesn't create
-    duplicate issues for the 103 undecided — wait, those are already
-    *rejected*, so a re-run is safe either way, see `decided_ids()`) to
-    confirm AI scoring actually completes end-to-end now, and that the new
-    quality tiers show up for real on freshly-reviewed items, not just
-    synthetic test data.
+10. ~~Added quality tiers, monthly view, client-side search~~ — done,
+    pushed (`196ee90`). Confirmed `Build and deploy site` actually fires
+    now too (`workflow_call` fix) and the live Pages URL serves the real
+    site with Kevin's 219 accepted items — search, quality filter, and
+    the all-time/by-month toggle all work.
+11. ~~Re-run `Harvest` to confirm AI scoring end-to-end~~ — ran (#4):
+    confirmed `ai_score` no longer errors (both earlier bugs are really
+    fixed), but found a fifth real bug: the review-directory-clear fix
+    only ran when there were new candidates, so a near-empty run (almost
+    everything already decided, OpenAlex itself rate-limited from
+    re-running harvest four times today) left stale already-published
+    files in place, and they got re-opened as duplicate issues (#3, #4).
+    Closed both as duplicates of #1/#2 with an explanation. Fixed
+    properly: the clear is now unconditional. Not yet pushed.
+12. Push this commit.
+13. Still outstanding: confirm AI scoring produces real relevance/quality
+    scores on a run with actual new candidates — every run so far has
+    either hit a bug before reaching it, or found ~nothing new to score.
+    The next *real* monthly cycle (or a deliberate `--topic` test once
+    OpenAlex's rate limit from today's testing clears) will be the first
+    real confirmation. Worth being less trigger-happy with manual
+    `workflow_dispatch` runs going forward — each one hits live rate
+    limits for real and leaves evidence (duplicate issues, in this case)
+    if a bug's still lurking in the empty-candidates path.

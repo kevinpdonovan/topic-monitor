@@ -119,24 +119,33 @@ def cmd_harvest(args) -> int:
         for it in deduped:
             corpus.upsert(it)
 
+        # Clear old review files *before* the empty-candidates check, not
+        # after — these are transient hand-off files for `gh issue create`
+        # (the issue itself is the permanent record; nothing re-reads this
+        # file afterwards), so a file left over from an earlier run must
+        # never sit here for harvest.yml's `topics/*/review/*.md` glob to
+        # pick up again. Two real bugs found live, both from exactly this
+        # directory not being cleared unconditionally:
+        #   - 2026-10-03, run 2: an oversized file from a run that failed
+        #     at issue-creation was still present on the next run and
+        #     failed `gh issue create` again, even though that run's own
+        #     files were fine. Fix (first pass): clear before writing.
+        #   - 2026-10-03, run 4: that fix only cleared the directory when
+        #     there *were* new candidates — a run that found none (e.g.
+        #     because every harvested item was already decided) left the
+        #     PREVIOUS run's already-published files sitting there, and
+        #     the next run's issue-creation step re-opened them as
+        #     duplicate issues (#3, #4, closed as duplicates of #1/#2).
+        #     Fix: clear unconditionally, before the candidates check.
+        review_dir = REPO_ROOT / "topics" / slug / "review"
+        review_dir.mkdir(parents=True, exist_ok=True)
+        for stale in review_dir.glob("*.md"):
+            stale.unlink()
+
         if not candidates:
             print(f"{slug}: 0 new candidates, no review file written")
             continue
 
-        review_dir = REPO_ROOT / "topics" / slug / "review"
-        review_dir.mkdir(parents=True, exist_ok=True)
-        # Clear old review files before writing this run's — these are
-        # transient hand-off files for `gh issue create` (the issue itself
-        # is the permanent record; nothing re-reads this file afterwards),
-        # so a file left over from an earlier failed run must not sit here
-        # and get picked up by harvest.yml's `topics/*/review/*.md` glob
-        # alongside this run's output. Real bug, first live run
-        # (2026-10-03): an oversized review file from a run that failed at
-        # issue-creation was still present on the next run and failed
-        # `gh issue create` again for the same reason, even though that
-        # run's own (correctly split) files succeeded.
-        for stale in review_dir.glob("*.md"):
-            stale.unlink()
         parts = issue_bodies(candidates, profile, run_label=run_label)
         for i, (_suffix, body) in enumerate(parts, start=1):
             review_path = review_dir / (f"{run_label}.md" if len(parts) == 1 else f"{run_label}-part{i}.md")
