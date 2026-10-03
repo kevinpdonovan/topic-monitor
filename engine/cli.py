@@ -90,7 +90,12 @@ def cmd_harvest(args) -> int:
     print(f"harvested {len(all_items)} raw -> {len(deduped)} after dedupe (rate {result['stats']['duplicate_rate']:.1%})")
 
     api_key = os.environ.get("ANTHROPIC_API_KEY", "")
-    tagger_model = os.environ.get("TAGGER_MODEL", "claude-haiku-4-5")
+    # os.environ.get(key, default) only falls back when the key is *absent*.
+    # harvest.yml always sets TAGGER_MODEL (to "${{ vars.TAGGER_MODEL }}"),
+    # which GitHub Actions renders as an empty string when the repo variable
+    # doesn't exist, rather than omitting the env var — so `.get` alone
+    # returns "" instead of the intended default. `or` catches that case too.
+    tagger_model = os.environ.get("TAGGER_MODEL") or "claude-haiku-4-5"
 
     for slug, profile in profiles.items():
         decisions = DecisionStore(DATA_DIR / "decisions" / f"{slug}.jsonl")
@@ -118,6 +123,18 @@ def cmd_harvest(args) -> int:
 
         review_dir = REPO_ROOT / "topics" / slug / "review"
         review_dir.mkdir(parents=True, exist_ok=True)
+        # Clear old review files before writing this run's — these are
+        # transient hand-off files for `gh issue create` (the issue itself
+        # is the permanent record; nothing re-reads this file afterwards),
+        # so a file left over from an earlier failed run must not sit here
+        # and get picked up by harvest.yml's `topics/*/review/*.md` glob
+        # alongside this run's output. Real bug, first live run
+        # (2026-10-03): an oversized review file from a run that failed at
+        # issue-creation was still present on the next run and failed
+        # `gh issue create` again for the same reason, even though that
+        # run's own (correctly split) files succeeded.
+        for stale in review_dir.glob("*.md"):
+            stale.unlink()
         parts = issue_bodies(candidates, profile, run_label=run_label)
         for i, (_suffix, body) in enumerate(parts, start=1):
             review_path = review_dir / (f"{run_label}.md" if len(parts) == 1 else f"{run_label}-part{i}.md")

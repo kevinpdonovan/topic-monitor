@@ -185,14 +185,15 @@ topic-monitor/
 
 ## Status
 
-Phase 0 done. Phase 1 (engine with scholarship and news) written, and as
-of the second live run on 2026-10-03 confirmed end-to-end on real data:
+Phase 0 done. Phase 1 (engine with scholarship and news) written and, as
+of the fourth live run on 2026-10-03, confirmed end-to-end on real data:
 OpenAlex, GDELT and all 6 RSS outlets harvest correctly, dedupe no longer
-crashes, and the review-issue split fix is in place for when the
-candidate list is large. The one thing still not live-verified is AI
-scoring, blocked on Kevin fixing the API key's workspace scoping (see
-below) — the pipeline doesn't depend on it to function, just to produce
-relevance scores/pre-ticks. Specifics:
+crashes, and the review-issue split produced two real, correctly-sized,
+correctly-labeled GitHub issues (#1, #2 — 296+26 research/report/book
+items between them) that Kevin can review right now. AI scoring still
+isn't live-confirmed — the workspace-scoping error is fixed, but a second,
+different bug (empty `TAGGER_MODEL` env var, see below) blocked it on this
+same run; the fix is written, needs one more run to confirm. Specifics:
 
 **Built:** item schema (`engine/pipeline/items.py`), JSONL corpus +
 decisions store (`corpus.py`), connectors for OpenAlex / GDELT / generic
@@ -283,6 +284,47 @@ not a guess):
     closed. Added a regression test built from this real 322-item/86KB
     case shape (`test_issue_bodies_splits_when_over_the_limit_regression`).
 
+**Third live run (2026-10-03, after the chunking fix, and after Kevin
+fixed the API key's workspace scoping): two real bugs, both found from the
+actual run output, not guessed.**
+  1. **Issue creation still failed** — but this time it was stale data, not
+     a sizing bug: `gh issue create` succeeded for the two new, correctly-
+     sized chunks (opened issues #1 and #2 — real, valid, still open for
+     Kevin to review), then failed with the *same* "Body is too long" error
+     on `topics/cbdc/review/2026-10-03.md`, an 86,602-char leftover from
+     the *first* failed run that harvest.yml's `topics/*/review/*.md` glob
+     picked up again because nothing had ever deleted it. These review
+     files exist only to hand content to `gh issue create` — nothing
+     re-reads them once an issue exists — so `cmd_harvest` now clears a
+     topic's `review/` directory before writing each run's files (`cli.py`).
+     Removed the stale file from the repo directly.
+  2. **AI scoring: workspace-scoping error gone, replaced by a different
+     one** — `Error code: 400 ... "model: String should have at least 1
+     character"`. Cause: `harvest.yml` always sets the `TAGGER_MODEL` env
+     var to `${{ vars.TAGGER_MODEL }}`, and GitHub Actions renders an
+     unset repo variable as an *empty string*, not an absent env var — so
+     `os.environ.get("TAGGER_MODEL", "claude-haiku-4-5")` returned `""`
+     instead of falling back, since `.get`'s default only applies to a
+     *missing* key, not an empty value. Kevin had correctly left the
+     variable unset per my own earlier instructions; this was my bug, not
+     a setup mistake. Fixed with `os.environ.get("TAGGER_MODEL") or
+     "claude-haiku-4-5"` (`cli.py`) — still needs a live run to confirm AI
+     scoring actually completes now, not just that this particular error
+     is gone.
+
+**What's confirmed solid after three real runs:** harvest (OpenAlex/GDELT/
+RSS), dedupe, keyword-gate scoring, issue splitting, and issue creation
+with real, correctly-formatted, interactive checkboxes (verified by
+opening issue #1 in the browser — pretick state, `matched [...]` reasons,
+and the "(part 1 of 2)" framing all rendered correctly). Two real open
+issues exist right now for Kevin to review:
+[#1](https://github.com/kevinpdonovan/topic-monitor/issues/1) (296
+articles + some books/reports) and
+[#2](https://github.com/kevinpdonovan/topic-monitor/issues/2) (26 items) —
+part of the same 322-candidate run. Not re-harvesting again before those
+are reviewed, to avoid opening redundant duplicate issues for the same
+undecided items.
+
 ## Known limitations
 
 - `dedupe.py`'s `work_key()` can't version-merge items whose title is
@@ -306,27 +348,31 @@ not a guess):
 
 ## Next steps before Phase 1 is fully closed out
 
-1. ~~Push Phase 1 commit~~ — done (`aac9e03`, via GitHub Desktop — no
-   stored git credential on this machine, so every push needs that step).
+1. ~~Push Phase 1 commit~~ — done (`aac9e03`).
 2. ~~Add `ANTHROPIC_API_KEY` and `CONTACT_EMAIL`~~ — done by Kevin.
-3. ~~Run `Harvest` by hand (1st try)~~ — failed on the dedupe crash. Fixed,
-   pushed (`8770479`), confirmed GitHub Pages also needed enabling in repo
-   Settings (done).
-4. ~~Re-run `Harvest` (2nd try)~~ — harvest itself succeeded (OpenAlex,
-   GDELT, all 6 RSS outlets, real health data, 322 candidates); failed at
+3. ~~Run `Harvest` (1st try)~~ — failed on the dedupe crash. Fixed, pushed
+   (`8770479`); also enabled GitHub Pages in repo Settings (was disabled).
+4. ~~Re-run `Harvest` (2nd try)~~ — harvest succeeded; failed at
    issue-creation on the 65,536-char body limit. Fixed via `issue_bodies()`
-   chunking (this commit).
-5. Push this commit (same GitHub Desktop step).
-6. Re-run `Harvest` a third time — this time should open a real review
-   issue (or several, if still over the per-issue limit) on GitHub.
-7. Kevin: fix the Anthropic API key's workspace scoping (Console →
-   Settings → API Keys → create/use a key scoped to a specific workspace)
-   and update the `ANTHROPIC_API_KEY` secret, whenever convenient — not
-   blocking the review issue, only blocks AI relevance scores/pre-ticks.
-8. Kevin reviews and closes the review issue(s).
-9. Confirm `Publish review` fired (Actions tab → green check, and
-   `data/decisions/cbdc.jsonl` has a new commit) and `Build and deploy
-   site` fired after it — then open the live Pages URL (Settings → Pages,
-   or the `deploy` job's output in that workflow run) and check the CBDC
-   topic page shows the accepted items and the health page shows real
-   source status.
+   chunking, pushed (`b1d2529`).
+5. ~~Kevin fixed the API key's workspace scoping~~ — done.
+6. ~~Re-run `Harvest` (3rd try)~~ — opened two real review issues (#1, #2);
+   also hit the stale-file bug and the empty-`TAGGER_MODEL` bug, both
+   above. Both fixed, not yet pushed.
+7. Push this commit (same GitHub Desktop step — no stored git credential
+   on this machine, so every push needs it).
+8. Kevin reviews and closes
+   [issue #1](https://github.com/kevinpdonovan/topic-monitor/issues/1) and
+   [#2](https://github.com/kevinpdonovan/topic-monitor/issues/2) — the real
+   first review, whenever he's ready. (Don't re-run `Harvest` before then —
+   it would just open redundant issues for the same undecided items.)
+9. Once both are closed: confirm `Publish review` fired for each (Actions
+   tab → green check, and `data/decisions/cbdc.jsonl` has a new commit per
+   close) and `Build and deploy site` fired after — then open the live
+   Pages URL (Settings → Pages, or the `deploy` job's output in that
+   workflow run) and check the CBDC topic page shows the accepted items
+   and the health page shows real source status.
+10. Separately, worth one more `Harvest` run (after the above, so it
+    doesn't create duplicate issues) just to confirm AI scoring actually
+    completes now that both bugs blocking it are fixed — the three runs so
+    far have each hit a new reason it didn't run, never confirmed it works.
