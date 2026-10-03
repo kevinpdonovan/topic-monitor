@@ -1,52 +1,52 @@
 {
   "run": "2026-10-03",
-  "run_at": "2026-10-03T10:07:02.963695+00:00",
+  "run_at": "2026-10-03T18:06:42.327512+00:00",
   "sources": [
     {
-      "count": 150,
-      "fail_streak": 0,
-      "note": "",
-      "ok": true,
+      "count": 100,
+      "fail_streak": 1,
+      "note": "HTTP 429",
+      "ok": false,
       "source": "openalex:central bank digital currency"
     },
     {
-      "count": 150,
-      "fail_streak": 0,
-      "note": "",
-      "ok": true,
+      "count": 0,
+      "fail_streak": 1,
+      "note": "HTTP 429",
+      "ok": false,
       "source": "openalex:CBDC retail payments"
     },
     {
-      "count": 150,
-      "fail_streak": 0,
-      "note": "",
-      "ok": true,
+      "count": 0,
+      "fail_streak": 1,
+      "note": "HTTP 429",
+      "ok": false,
       "source": "openalex:CBDC wholesale cross-border"
     },
     {
-      "count": 150,
-      "fail_streak": 0,
-      "note": "",
-      "ok": true,
+      "count": 0,
+      "fail_streak": 1,
+      "note": "HTTP 429",
+      "ok": false,
       "source": "openalex:digital euro design"
     },
     {
-      "count": 150,
-      "fail_streak": 0,
-      "note": "",
-      "ok": true,
+      "count": 0,
+      "fail_streak": 1,
+      "note": "HTTP 429",
+      "ok": false,
       "source": "openalex:e-CNY digital yuan"
     },
     {
       "count": 0,
-      "fail_streak": 2,
+      "fail_streak": 3,
       "note": "HTTP 429 rate-limited",
       "ok": false,
       "source": "gdelt:central bank digital currency"
     },
     {
       "count": 0,
-      "fail_streak": 2,
+      "fail_streak": 3,
       "note": "HTTP 429 rate-limited",
       "ok": false,
       "source": "gdelt:CBDC pilot"
@@ -95,16 +95,16 @@
     },
     {
       "count": 0,
-      "fail_streak": 2,
-      "note": "Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'model: String should have at least 1 character'}, 'request_id': 'req_011Cff7nq4xRr1oaunGXZE2p'}",
-      "ok": false,
+      "fail_streak": 0,
+      "note": "",
+      "ok": true,
       "source": "ai_score"
     }
   ],
   "stats": {
-    "items_total": 951,
-    "sources_failing": 3,
-    "sources_ok": 11,
+    "items_total": 301,
+    "sources_failing": 7,
+    "sources_ok": 7,
     "sources_total": 14
   }
 }
