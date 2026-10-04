@@ -71,7 +71,10 @@ ul.items li a.title:hover { text-decoration: underline; }
 #source-list .src-name.muted { text-decoration: line-through; color: var(--muted); }
 #source-list .src-count { color: var(--muted); font-size: 0.8rem; }
 
-.item-actions { margin-top: 0.3rem; display: flex; gap: 0.4rem; flex-wrap: wrap; opacity: 0; transition: opacity 0.12s; }
+/* Always visible, just quiet. These were hover-only at first, which made
+   them undiscoverable — you had to happen to mouse over a row to learn
+   the controls existed at all, which defeats the point of having them. */
+.item-actions { margin-top: 0.3rem; display: flex; gap: 0.4rem; flex-wrap: wrap; opacity: 0.5; transition: opacity 0.12s; }
 ul.items li:hover .item-actions, ul.items li:focus-within .item-actions { opacity: 1; }
 ul.items li.is-suppressed { opacity: 0.55; }
 ul.items li.is-suppressed .item-actions { opacity: 1; }
@@ -81,11 +84,6 @@ button.act {
 }
 button.act:hover { color: var(--fg); border-color: var(--muted); }
 .badge.suppressed { color: var(--fail); border-color: var(--fail); }
-
-/* Touch devices have no hover, so never leave the controls unreachable. */
-@media (hover: none) {
-  .item-actions { opacity: 1; }
-}
 table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
 th, td { text-align: left; padding: 0.4rem 0.6rem; border-bottom: 1px solid var(--line); font-size: 0.9rem; }
 th { color: var(--muted); font-weight: 600; }
