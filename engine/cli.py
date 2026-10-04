@@ -40,7 +40,13 @@ from engine.pipeline.backfill import (
 from engine.pipeline.corpus import Corpus, DecisionStore
 from engine.pipeline.dedupe import dedupe
 from engine.pipeline.health import aggregate_health, load_health, save_health
-from engine.pipeline.profile import REPO_ROOT, list_topics, load_profile, outlets_for_topic
+from engine.pipeline.profile import (
+    REPO_ROOT,
+    alert_sources_for_topic,
+    list_topics,
+    load_profile,
+    outlets_for_topic,
+)
 from engine.pipeline.review import issue_bodies, parse_review
 from engine.pipeline.score import ai_score, run_keyword_gate
 
@@ -98,6 +104,8 @@ def cmd_harvest(args) -> int:
         for q in (connectors.get("gdelt", {}) or {}).get("queries", []):
             gdelt_queries.setdefault(q, []).append(slug)
         for src in outlets_for_topic(profile):
+            rss_sources.setdefault(src["id"], src)
+        for src in alert_sources_for_topic(profile):
             rss_sources.setdefault(src["id"], src)
 
     all_items = []

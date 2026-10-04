@@ -82,4 +82,25 @@ connectors:
       - coindesk
       - ledgerinsights
 
-alerts: []   # populated once the Phase 2 wizard creates Google Alerts
+# Google Alerts Kevin created by hand in his own account (Google Alerts has
+# no API — see engine/connectors/google_alerts.py). Feed URLs are read from
+# the environment, not stored here: the URL embeds the Google account id
+# that owns the alert, this repo is public, and a feed URL can't be rotated
+# without deleting and recreating the alert. Set the named variable as a
+# GitHub Actions secret (and in a local .env for interactive runs).
+alerts:
+  - id: cbdc-core
+    query: '"central bank digital currency"'
+    feed_url_env: CBDC_ALERT_FEED_URL
+    language: en
+    source_type: news
+    status: tested
+    verified: 2026-10-04
+    note: >
+      Live request 2026-10-04 returned HTTP 200 and well-formed Atom for the
+      right alert ("Google Alert - \"central bank digital currency\""), but
+      zero entries — the alert was minutes old and Google had not matched
+      anything yet. So the URL is confirmed; what is NOT yet confirmed on
+      live data is entry parsing, redirect unwrapping and markup stripping
+      (unit-tested against a recorded-shape fixture only). Check the first
+      run that returns entries.

@@ -33,6 +33,10 @@ jobs:
           CONTACT_EMAIL: ${{ vars.CONTACT_EMAIL }}
           TAGGER_MODEL: ${{ vars.TAGGER_MODEL }}
           OPENALEX_API_KEY: ${{ secrets.OPENALEX_API_KEY }}
+          # Google Alerts feed URLs, kept out of this public repo — each
+          # topic profile's `alerts:` entries name the variable to read
+          # (feed_url_env). Add one line here per new alert secret.
+          CBDC_ALERT_FEED_URL: ${{ secrets.CBDC_ALERT_FEED_URL }}
         run: python -m engine harvest
 
       - name: Commit harvested data

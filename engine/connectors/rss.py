@@ -26,9 +26,19 @@ def _to_item(entry, source: dict):
 
     title = (entry.get("title") or "").strip()
     url = entry.get("link") or ""
+    summary = (entry.get("summary") or entry.get("description") or "").strip()
+
+    # Optional per-source cleanup, applied *before* make_item so the
+    # item id is computed from the real URL. Google Alerts needs this:
+    # its entry links are google.com/url?...&url=<real> redirects, which
+    # would otherwise never dedupe against the same article arriving via
+    # GDELT or an outlet feed. See connectors/google_alerts.py.
+    transform = source.get("transform")
+    if transform:
+        title, url, summary = transform(title, url, summary)
+
     if not title or not url:
         return None
-    summary = (entry.get("summary") or entry.get("description") or "").strip()
     return make_item(
         title=title,
         source_type=source.get("source_type", "news"),
@@ -72,8 +82,20 @@ def harvest_rss(sources: list, *, timeout: int = 20) -> tuple:
                         items.append(item)
                         count += 1
                 if count == 0:
-                    ok = False
-                    note = "0 entries returned"
+                    # An outlet feed returning nothing means something
+                    # broke. A Google Alert returning nothing just means
+                    # Google hasn't matched anything since the alert was
+                    # created — confirmed live 2026-10-04 against Kevin's
+                    # brand-new CBDC alert, which served a valid, entirely
+                    # empty Atom feed. Flagging that as a failure would
+                    # give the health page a permanent false alarm (and a
+                    # climbing fail_streak) for a source working exactly
+                    # as intended, so sources can opt out via empty_ok.
+                    if source.get("empty_ok"):
+                        note = "no matches yet (0 entries, expected for a quiet alert)"
+                    else:
+                        ok = False
+                        note = "0 entries returned"
         except Exception as exc:  # feedparser swallows most errors into bozo, but be defensive
             ok = False
             note = str(exc)

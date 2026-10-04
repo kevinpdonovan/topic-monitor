@@ -3,6 +3,7 @@ Python — connectors and pipeline code must stay topic-agnostic.
 """
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import yaml
@@ -62,6 +63,44 @@ def outlets_for_topic(profile: dict) -> list:
                 "source_type": outlet.get("source_type", "news"),
                 "connector": "outlet_rss",
                 "language": outlet.get("language", "en"),
+            }
+        )
+    return sources
+
+
+def alert_sources_for_topic(profile: dict) -> list:
+    """Resolve a topic's `alerts:` list (Google Alerts feeds Kevin created by
+    hand) into RSS source dicts, keeping only `status: tested` entries.
+
+    A feed URL can be given either literally as `feed_url`, or indirectly as
+    `feed_url_env: SOME_ENV_VAR` — the latter keeps the URL out of a public
+    repo, which matters because a Google Alerts feed URL embeds the Google
+    account id that owns the alert and can't be rotated without deleting and
+    recreating the alert. An entry naming an env var that isn't set is
+    skipped with no source emitted (the caller's health report will simply
+    not list it, rather than the run failing).
+    """
+    from engine.connectors.google_alerts import transform
+
+    sources = []
+    for alert in profile.get("alerts", []) or []:
+        if not isinstance(alert, dict) or alert.get("status") != "tested":
+            continue
+        url = alert.get("feed_url") or os.environ.get(alert.get("feed_url_env", ""), "")
+        if not url:
+            continue
+        sources.append(
+            {
+                "id": alert.get("id", url),
+                "url": url,
+                "venue": "Google Alert",
+                "organisation": "",
+                "source_type": alert.get("source_type", "news"),
+                "connector": "google_alerts",
+                "language": alert.get("language", "en"),
+                "transform": transform,
+                # A quiet alert legitimately returns nothing — see harvest_rss.
+                "empty_ok": True,
             }
         )
     return sources
