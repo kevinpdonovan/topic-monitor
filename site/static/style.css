@@ -61,6 +61,31 @@ ul.items li a.title:hover { text-decoration: underline; }
 .view-toggle button { padding: 0.3rem 0.7rem; border: 1px solid var(--line); border-radius: 6px; background: transparent; color: var(--muted); font-size: 0.85rem; cursor: pointer; }
 .view-toggle button.active { color: var(--bg); background: var(--accent); border-color: var(--accent); }
 #result-count { margin: 0.6rem 0 0; }
+#controls .note { margin: 0.4rem 0 0; font-size: 0.8rem; opacity: 0.85; }
+#send-corrections { color: var(--bg); background: var(--accent); border-color: var(--accent); font-weight: 600; }
+
+#source-panel { margin-top: 0.8rem; border-top: 1px solid var(--line); padding-top: 0.6rem; }
+#source-list { list-style: none; margin: 0.4rem 0 0; padding: 0; max-height: 15rem; overflow-y: auto; }
+#source-list li { display: flex; align-items: center; gap: 0.5rem; padding: 0.25rem 0; font-size: 0.88rem; }
+#source-list .src-name { flex: 1; }
+#source-list .src-name.muted { text-decoration: line-through; color: var(--muted); }
+#source-list .src-count { color: var(--muted); font-size: 0.8rem; }
+
+.item-actions { margin-top: 0.3rem; display: flex; gap: 0.4rem; flex-wrap: wrap; opacity: 0; transition: opacity 0.12s; }
+ul.items li:hover .item-actions, ul.items li:focus-within .item-actions { opacity: 1; }
+ul.items li.is-suppressed { opacity: 0.55; }
+ul.items li.is-suppressed .item-actions { opacity: 1; }
+button.act {
+  padding: 0.1rem 0.45rem; border: 1px solid var(--line); border-radius: 4px;
+  background: transparent; color: var(--muted); font-size: 0.75rem; cursor: pointer;
+}
+button.act:hover { color: var(--fg); border-color: var(--muted); }
+.badge.suppressed { color: var(--fail); border-color: var(--fail); }
+
+/* Touch devices have no hover, so never leave the controls unreachable. */
+@media (hover: none) {
+  .item-actions { opacity: 1; }
+}
 table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
 th, td { text-align: left; padding: 0.4rem 0.6rem; border-bottom: 1px solid var(--line); font-size: 0.9rem; }
 th { color: var(--muted); font-weight: 600; }

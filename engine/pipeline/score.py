@@ -46,6 +46,19 @@ def keyword_gate(item: dict, profile: dict) -> dict:
         if term in blob:
             return {"passed": False, "matched_terms": [], "reason": f"excluded: matched {term!r}"}
 
+    # Venue-level exclusions. The site's "mute source" control lists item
+    # *venues* (Zenodo, SSRN, a journal name), most of which arrive via
+    # OpenAlex rather than being configured outlets — so muting them can't
+    # be done by flipping a status in registry/outlets.yaml the way a dead
+    # RSS feed can. This is where a muted source actually stops being
+    # harvested into the review queue. See CLAUDE.md, "Applying
+    # corrections from the site".
+    venue = (item.get("venue") or "").strip().lower()
+    if venue:
+        for excluded in profile.get("excluded_venues", []) or []:
+            if venue == str(excluded).strip().lower():
+                return {"passed": False, "matched_terms": [], "reason": f"excluded venue: {excluded!r}"}
+
     keywords = profile.get("keywords", [])
     matched = []
     for kw in keywords:

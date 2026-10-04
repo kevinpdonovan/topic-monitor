@@ -5,7 +5,7 @@
 <p class="muted">{{ topic.description }}</p>
 <p class="muted">{{ items|length }} accepted items &middot; cadence: {{ topic.cadence }}</p>
 
-<div id="app" data-items-url="items.json">
+<div id="app" data-items-url="items.json" data-slug="{{ topic.slug }}">
   <div id="controls" hidden>
     <input id="search-input" type="search" placeholder="Search titles, authors, venues, tags…" aria-label="Search">
     <div class="quality-filter">
@@ -17,8 +17,20 @@
     <div class="view-toggle">
       <button type="button" data-view="all" class="active">All time</button>
       <button type="button" data-view="month">By month</button>
+      <button type="button" id="sources-toggle">Sources…</button>
+      <button type="button" id="show-hidden" hidden>Show suppressed</button>
+      <button type="button" id="send-corrections" hidden>Send corrections →</button>
+    </div>
+    <div id="source-panel" hidden>
+      <p class="muted">Mute a source to drop everything from it out of view.</p>
+      <ul id="source-list"></ul>
     </div>
     <p class="muted" id="result-count"></p>
+    <p class="muted note">
+      Hiding, muting and low-quality marks are saved in this browser only.
+      Use <em>Send corrections</em> to push them back into the pipeline so
+      they stick everywhere and stop items like them being harvested again.
+    </p>
   </div>
 
   <div id="results">

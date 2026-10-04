@@ -151,6 +151,7 @@ brief, and why.
 | Monthly view | **Client-side toggle on the same page**, not separate pre-rendered monthly pages | Kevin wants to view publications by month as well as the full archive. A JS toggle (grouping the same `items.json` by `date`'s year-month) does both without doubling the number of generated pages or losing search/filter state when switching views. |
 | Quality tiers (high/medium/low) | **AI-judged per item, NOT from journal prestige/h-index/citations** | Kevin was explicit: favor empirical work with real evidence (esp. case studies) and strong theoretical/conceptual contributions; hold "systematic reviews"/"literature reviews" to a high bar by default; and actively value heterodox, anti-systemic and Global South political economy work rather than penalizing it for being unfamiliar or non-mainstream. Implemented as a rubric in `score.py`'s AI prompt, with `registry/quality_signals.yaml` supplying a list of known-rigorous heterodox/Global South sources as positive context — deliberately asymmetric (no equivalent "mainstream prestige" list), since adding one would just reproduce the Eurocentric bias this exists to counter. |
 | Historical backfill | **One-time, manually-triggered, scholarship-only, age-weighted citation pre-filter, start at 1 year back** | Kevin wants to pull further back than the regular 12-month window, winnowed so an old uncited piece doesn't make the cut but a recent one isn't held to the same citation bar (it hasn't had time to accumulate any). `engine/pipeline/backfill.py`'s `min_citations_for_age()` gives a grace period (default 90 days, always passes regardless of citations) then requires linearly more citations per month beyond it — explicitly a volume-reduction step before the same AI quality rubric runs, not a quality judgment itself (a flat citation cutoff would reproduce exactly the recency bias the quality-tier design above was built to avoid). GDELT/RSS have no multi-year history via their feeds, so this is OpenAlex-only. Started at 1 year back per Kevin's instruction, not the 5 he first floated — `--years-back` is a CLI/workflow parameter, trivial to push further once the 1-year run's output has been sanity-checked. |
+| Post-hoc corrections from the site | **Instant browser-local effect, plus an explicit "send corrections" hand-off that makes it real** | Kevin wants to cull junk while *reading* the site, not only during review — things slip through and you only notice later. A static page can't write to the repo, and a token in client-side JS is out of the question, so hiding/muting is `localStorage` for immediate effect, with a button that exports the marks as a `corrections` issue for a session to apply to the decisions store. The page states plainly that marks are browser-local until sent, rather than implying a decision stuck. Muting a source also needed real teeth: `excluded_venues:` in the topic profile, enforced in `keyword_gate` — venues mostly come from OpenAlex, so `registry/outlets.yaml` couldn't express it. |
 | Google Alerts feed URLs | **Read from env/Actions secrets (`feed_url_env`), never committed** | Kevin created the first alert by hand on 2026-10-04 and the feed URL embeds his Google account id. This repo is public and git history is permanent, so the URL is referenced indirectly by variable name from `topics/<slug>/profile.yaml`. Confirmed with Kevin rather than assumed — the build brief's own schema says to store the RSS URLs in the profile, which predates the repo being public. Each new alert needs its secret added in repo Settings and one passthrough line in `harvest.yml`. |
 | New-topic wizard entry point | **Site form → pre-filled GitHub issue → a live Claude Code session works it from there, asynchronously** | Kevin wants to search/request a new topic from the site and have Claude ask clarifying questions. A static GitHub Pages site has no backend, and putting an Anthropic API key in client-side JS to enable live chat would be a real security/cost problem — confirmed with Kevin this async, issue-mediated hand-off (matching how review issues already work, and matching the build brief's own wizard design, which explicitly runs "inside a Claude Code session so a model is available") is the right shape, not instant in-page chat. See "Handling a new-topic request" below. |
 
@@ -412,6 +413,40 @@ clear, then decide whether to write," not "clear only when writing."
     expansion tooling are built now (see "Handling a new-topic request"
     below), ahead of schedule, at Kevin's request — the rest of Phase 2
     is unaffected.
+
+## Applying corrections from the site
+
+Each topic page has per-item `hide` / `mark low` / `mute source` controls
+and a source list with mute toggles. **Those are browser-local only** —
+they're stored in `localStorage` under `topic-monitor:<slug>`, so they
+take effect instantly and survive reloads, but they live in one browser,
+teach the pipeline nothing, and vanish if site data is cleared. The page
+says so, in those words, rather than implying the decision stuck.
+
+The **"Send corrections →"** button turns them into a pre-filled GitHub
+issue labeled `corrections`, listing item ids + titles and muted source
+names. When one of those arrives, apply it properly:
+
+- **Reject these items** → record each id as `rejected` in
+  `data/decisions/<slug>.jsonl` (`DecisionStore.record`). This both drops
+  them from the site and stops them ever being offered again, since
+  `cmd_harvest` filters candidates against `decided_ids()`.
+- **Mark these low quality** → set `quality: "low"` on that id's decision
+  record. It stays accepted and on the site, but falls under the Low
+  filter so Kevin can bulk-hide it.
+- **Stop harvesting these sources** → add the venue to the topic
+  profile's `excluded_venues:`. Note this is *not* usually a
+  `registry/outlets.yaml` change: the site's source list shows item
+  venues, and most of them (Zenodo, SSRN, a journal name) arrive via
+  OpenAlex rather than being configured RSS outlets. `outlets.yaml` is
+  only right when the muted source genuinely is one of the configured
+  feeds. `keyword_gate` enforces `excluded_venues` with an exact,
+  case-insensitive match, so "Zenodo" won't swallow "Zenodo Review of
+  Economics".
+
+Then rebuild (`python -m engine build`) so the site reflects it, and
+tell Kevin he can clear his local marks for anything now applied upstream
+(they're harmless if left — the item is gone from `items.json` anyway).
 
 ## Handling a new-topic request
 

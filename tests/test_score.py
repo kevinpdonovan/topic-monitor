@@ -22,6 +22,27 @@ def test_keyword_gate_rejects_on_exclusion_even_if_keyword_also_matches():
     assert "excluded" in gate["reason"]
 
 
+def test_keyword_gate_excludes_a_muted_venue_even_when_keywords_match():
+    # Backs the site's "mute source" control: muting a venue has to stop it
+    # reaching the review queue, not just hide it in one browser. Venue
+    # names mostly come from OpenAlex, so this can't be done in
+    # registry/outlets.yaml.
+    profile = dict(PROFILE, excluded_venues=["Zenodo"])
+    item = make_item(title="A CBDC paper", source_type="article", connector="openalex", venue="Zenodo", doi="10.1/z")
+    gate = keyword_gate(item, profile)
+    assert not gate["passed"]
+    assert "excluded venue" in gate["reason"]
+
+
+def test_keyword_gate_venue_exclusion_is_case_insensitive_and_exact():
+    profile = dict(PROFILE, excluded_venues=["zenodo"])
+    muted = make_item(title="A CBDC paper", source_type="article", connector="openalex", venue="Zenodo", doi="10.1/a")
+    assert not keyword_gate(muted, profile)["passed"]
+    # ...but it must not swallow a different venue that merely contains it
+    other = make_item(title="A CBDC paper", source_type="article", connector="openalex", venue="Zenodo Review of Economics", doi="10.1/b")
+    assert keyword_gate(other, profile)["passed"]
+
+
 def test_keyword_gate_rejects_unrelated_item():
     item = make_item(title="A new recipe for sourdough bread", source_type="news", connector="test")
     gate = keyword_gate(item, PROFILE)
