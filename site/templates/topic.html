@@ -34,23 +34,33 @@
   </div>
 
   <div id="results">
-    {% for source_type, group in groups %}
-    <h2>{{ source_type }} ({{ group|length }})</h2>
-    <ul class="items">
-      {% for item in group %}
-      <li>
-        <a class="title" href="{{ item.url or item.pdf_url }}">{{ item.title }}</a>
-        {% if item.quality %}<span class="badge quality-{{ item.quality }}">{{ item.quality|capitalize }}</span>{% else %}<span class="badge quality-unscored">Unscored</span>{% endif %}
-        {% if item.featured %}<span class="badge featured">featured</span>{% endif %}
-        <div class="meta">
-          {{ item.authors|join(', ') if item.authors else item.organisation }}
-          {% if item.venue %} &middot; {{ item.venue }}{% endif %}
-          {% if item.date %} &middot; {{ item.date }}{% endif %}
-        </div>
-      </li>
+    {% macro item_groups(groups) %}
+      {% for source_type, group in groups %}
+      <h2>{{ source_type }} ({{ group|length }})</h2>
+      <ul class="items">
+        {% for item in group %}
+        <li>
+          <a class="title" href="{{ item.url or item.pdf_url }}">{{ item.title }}</a>
+          {% if item.quality %}<span class="badge quality-{{ item.quality }}">{{ item.quality|capitalize }}</span>{% else %}<span class="badge quality-unscored">Unscored</span>{% endif %}
+          {% if item.featured %}<span class="badge featured">featured</span>{% endif %}
+          <div class="meta">
+            {{ item.authors|join(', ') if item.authors else item.organisation }}
+            {% if item.venue %} &middot; {{ item.venue }}{% endif %}
+            {% if item.date %} &middot; {{ item.date }}{% endif %}
+          </div>
+        </li>
+        {% endfor %}
+      </ul>
       {% endfor %}
-    </ul>
-    {% endfor %}
+    {% endmacro %}
+    {% if groups_left and groups_right %}
+    <div class="columns">
+      <div class="col">{{ item_groups(groups_left) }}</div>
+      <div class="col">{{ item_groups(groups_right) }}</div>
+    </div>
+    {% else %}
+    {{ item_groups(groups_left + groups_right) }}
+    {% endif %}
   </div>
 </div>
 

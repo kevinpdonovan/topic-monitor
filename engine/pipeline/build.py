@@ -116,6 +116,11 @@ def build() -> dict:
         groups: dict = {}
         for item in items:
             groups.setdefault(item.get("source_type", "article"), []).append(item)
+        # Same split the JS layer uses (see site/static/topic.js): articles
+        # left, everything else right, so the two agree and the page doesn't
+        # visibly reflow when the JS takes over.
+        groups_left = sorted((t, g) for t, g in groups.items() if t == "article")
+        groups_right = sorted((t, g) for t, g in groups.items() if t != "article")
         topic_dir = OUT_DIR / slug
         topic_dir.mkdir(parents=True, exist_ok=True)
         (topic_dir / "items.json").write_text(_items_json(items), encoding="utf-8")
@@ -126,7 +131,8 @@ def build() -> dict:
                 active_slug=slug,
                 topic=profile,
                 items=items,
-                groups=sorted(groups.items()),
+                groups_left=groups_left,
+                groups_right=groups_right,
             ),
             encoding="utf-8",
         )

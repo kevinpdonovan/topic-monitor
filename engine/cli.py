@@ -24,6 +24,7 @@ from __future__ import annotations
 import argparse
 import os
 import sys
+import time
 from datetime import date
 from pathlib import Path
 
@@ -272,6 +273,63 @@ def cmd_backfill(args) -> int:
     return 0
 
 
+def cmd_repair_venues(args) -> int:
+    """Re-resolve venues for already-harvested OpenAlex items.
+
+    `Corpus.upsert` only fills in *empty* fields on an existing item, so a
+    change to how venues are chosen (see openalex.pick_venue) doesn't reach
+    anything already stored — without this, an improvement only shows up on
+    items harvested afterwards. Re-queries OpenAlex and rewrites a venue
+    only where the recomputed value actually differs.
+    """
+    from engine.connectors.openalex import make_session, pick_venue
+
+    contact_email = os.environ.get("CONTACT_EMAIL", "")
+    if not contact_email:
+        print("CONTACT_EMAIL not set — required for the OpenAlex polite pool", file=sys.stderr)
+        return 1
+
+    corpus = Corpus(DATA_DIR / "items.jsonl")
+    by_oa_id = {}
+    for item in corpus.all():
+        oa_id = (item.get("extra") or {}).get("openalex_id") or ""
+        short = oa_id.rsplit("/", 1)[-1]
+        if short.startswith("W"):
+            by_oa_id[short] = item
+    print(f"{len(by_oa_id)} OpenAlex items in the corpus to re-resolve")
+
+    session = make_session(contact_email)
+    ids = list(by_oa_id)
+    changed = 0
+    for i in range(0, len(ids), 25):
+        chunk = ids[i : i + 25]
+        resp = session.get(
+            "https://api.openalex.org/works",
+            params={"filter": "openalex_id:" + "|".join(chunk), "per-page": 25},
+            timeout=30,
+        )
+        if resp.status_code != 200:
+            print(f"  HTTP {resp.status_code} on batch {i // 25 + 1}, skipping", file=sys.stderr)
+            continue
+        for work in resp.json().get("results", []):
+            short = (work.get("id") or "").rsplit("/", 1)[-1]
+            item = by_oa_id.get(short)
+            if not item:
+                continue
+            venue, repository = pick_venue(work)
+            if venue and venue != item.get("venue"):
+                if args.verbose:
+                    print(f"  {item.get('venue') or '(none)'!r} -> {venue!r}  {item['title'][:50]}")
+                item["venue"] = venue
+                item.setdefault("extra", {})["repository"] = repository
+                changed += 1
+        time.sleep(0.2)
+
+    corpus.save()
+    print(f"rewrote {changed} venues")
+    return 0
+
+
 def cmd_publish(args) -> int:
     profile = load_profile(args.topic)
     body = Path(args.issue_body_file).read_text(encoding="utf-8")
@@ -344,6 +402,10 @@ def main(argv=None) -> int:
 
     p_build = sub.add_parser("build", help="re-render the site from current data/")
     p_build.set_defaults(func=cmd_build)
+
+    p_repair = sub.add_parser("repair-venues", help="re-resolve venues for already-harvested OpenAlex items")
+    p_repair.add_argument("--verbose", action="store_true", help="print each venue that changes")
+    p_repair.set_defaults(func=cmd_repair_venues)
 
     p_wizard = sub.add_parser("wizard-expand", help="sample OpenAlex for seed terms, print candidate related terms")
     p_wizard.add_argument("--seed", nargs="+", required=True, help="one or more seed keywords")

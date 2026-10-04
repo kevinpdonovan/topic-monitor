@@ -154,11 +154,28 @@
     }).join("");
   }
 
+  // Research articles dominate the corpus (200 of 219 at the time of
+  // writing), so a single stream buries everything else 200 items down the
+  // page. Articles take the left column; chapters, books, working papers,
+  // grey literature, official documents and news share the right, which
+  // keeps the two sides roughly even and puts the non-journal material —
+  // the stuff this project exists to surface — where it can be seen.
+  var LEFT_COLUMN_TYPES = ["article"];
+
+  function renderColumns(items) {
+    var left = items.filter(function (it) { return LEFT_COLUMN_TYPES.indexOf(it.source_type) !== -1; });
+    var right = items.filter(function (it) { return LEFT_COLUMN_TYPES.indexOf(it.source_type) === -1; });
+    // A lone column reads better full width than squeezed into half.
+    if (!left.length || !right.length) return renderGroups(items);
+    return '<div class="columns"><div class="col">' + renderGroups(left) +
+           '</div><div class="col">' + renderGroups(right) + "</div></div>";
+  }
+
   function renderByMonth(items) {
     var byMonth = {};
     items.forEach(function (it) { (byMonth[it.month] = byMonth[it.month] || []).push(it); });
     return Object.keys(byMonth).sort().reverse().map(function (m) {
-      return '<h2 class="month-heading">' + monthLabel(m) + " (" + byMonth[m].length + ")</h2>" + renderGroups(byMonth[m]);
+      return '<h2 class="month-heading">' + monthLabel(m) + " (" + byMonth[m].length + ")</h2>" + renderColumns(byMonth[m]);
     }).join("");
   }
 
@@ -203,7 +220,7 @@
     var resultsEl = document.getElementById("results");
     if (!resultsEl) return;
     resultsEl.innerHTML = items.length
-      ? (state.view === "month" ? renderByMonth(items) : renderGroups(items))
+      ? (state.view === "month" ? renderByMonth(items) : renderColumns(items))
       : '<p class="muted">No items match the current filters.</p>';
   }
 

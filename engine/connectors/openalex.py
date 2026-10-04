@@ -36,6 +36,79 @@ def make_session(contact_email: str) -> requests.Session:
     return s
 
 
+def clean_source_name(source: dict) -> str:
+    """Source display name without the host-organisation parenthetical
+    OpenAlex appends to repository names.
+
+    "Zenodo (CERN European Organization for Nuclear Research)" becomes
+    "Zenodo", "arXiv (Cornell University)" becomes "arXiv". CERN appears
+    only because it operates Zenodo's infrastructure — it says nothing
+    about the work, and reads as though a CBDC paper came out of a
+    particle-physics lab.
+
+    The trailing bracket is only dropped when it contains the recorded
+    host organisation, so a name whose brackets are part of the name
+    ("Review (Fernand Braudel Center)", hosted by Duke University Press)
+    keeps them. Containment rather than equality because OpenAlex doesn't
+    render the two identically — Zenodo's bracket reads "CERN European
+    Organization for Nuclear Research" while its host field is
+    "European Organization for Nuclear Research".
+    """
+    name = (source.get("display_name") or "").strip()
+    host = (source.get("host_organization_name") or "").strip()
+    if not host or not name.endswith(")"):
+        return name
+    open_bracket = name.rfind("(")
+    if open_bracket == -1:
+        return name
+    if host.lower() in name[open_bracket + 1 : -1].lower():
+        return name[:open_bracket].strip()
+    return name
+
+
+def pick_venue(work: dict) -> tuple:
+    """Choose the most informative venue for a work: (venue, repository).
+
+    OpenAlex's `primary_location` for a deposited copy is the repository
+    that holds it, not where the work actually appeared — so an academic
+    book chapter shows up as "Zenodo" or with no venue at all. Scanning
+    every location for a non-repository source recovers the real
+    publisher: on the live corpus (2026-10-04) this turned 11 of 45
+    Zenodo/venueless items into properly attributed Routledge, Springer,
+    Edward Elgar and CRC Press chapters — exactly the book material this
+    project exists to surface. The other 34 were genuine standalone
+    deposits, where the repository really is the source.
+
+    Deliberately does NOT change the item's URL: that would change
+    `item_id` (derived from the URL) for everything already harvested,
+    breaking dedup against the existing corpus. The repository landing
+    page is usually the open-access copy anyway, which is the more
+    useful link to hand a reader.
+    """
+    locations = list(work.get("locations") or [])
+    primary = work.get("primary_location") or {}
+    if primary and primary not in locations:
+        locations.insert(0, primary)
+
+    published = repository = None
+    for loc in locations:
+        source = loc.get("source") or {}
+        if not source.get("display_name"):
+            continue
+        if source.get("type") == "repository":
+            repository = repository or source
+        else:
+            published = published or source
+
+    if published:
+        # Only record the repository separately when it isn't the venue,
+        # so the extra field stays meaningful rather than duplicating.
+        return clean_source_name(published), (clean_source_name(repository) if repository else "")
+    if repository:
+        return clean_source_name(repository), ""
+    return "", ""
+
+
 def _to_item(work: dict):
     from engine.pipeline.items import make_item
 
@@ -49,7 +122,7 @@ def _to_item(work: dict):
     primary = work.get("primary_location") or {}
     url = primary.get("landing_page_url") or work.get("id") or ""
     pdf_url = primary.get("pdf_url") or ""
-    venue = ((primary.get("source") or {}) or {}).get("display_name") or ""
+    venue, repository = pick_venue(work)
 
     authors = []
     for a in work.get("authorships", []) or []:
@@ -77,7 +150,11 @@ def _to_item(work: dict):
         date=work.get("publication_date") or "",
         abstract=abstract[:2000],
         venue=venue,
-        extra={"openalex_id": work.get("id"), "cited_by_count": work.get("cited_by_count")},
+        extra={
+            "openalex_id": work.get("id"),
+            "cited_by_count": work.get("cited_by_count"),
+            "repository": repository,  # where the copy lives, when that isn't the venue
+        },
     )
 
 
