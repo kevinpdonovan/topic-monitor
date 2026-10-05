@@ -92,6 +92,10 @@ button.act {
 }
 button.act:hover { color: var(--fg); border-color: var(--muted); }
 button.act.on { color: var(--accent); border-color: var(--accent); font-weight: 600; }
+span.act.published {
+  display: inline-block; padding: 0.1rem 0.45rem; border: 1px solid var(--accent);
+  border-radius: 4px; font-size: 0.75rem; color: var(--accent); font-weight: 600;
+}
 .badge.suppressed { color: var(--fail); border-color: var(--fail); }
 .badge.bookmarked { color: var(--accent); border-color: var(--accent); }
 #bookmarked-toggle.active { color: var(--bg); background: var(--accent); border-color: var(--accent); }

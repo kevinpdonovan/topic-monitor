@@ -65,7 +65,16 @@
   // --- item helpers --------------------------------------------------
   function sourceOf(item) { return item.venue || item.organisation || "(no source)"; }
   function isHidden(item) { return prefs.hidden.indexOf(item.id) !== -1; }
-  function isBookmarked(item) { return prefs.bookmarked.indexOf(item.id) !== -1; }
+
+  // A bookmark counts if it's marked in this browser *or* has been applied
+  // upstream (published as featured: true). Without the second half, a
+  // bookmark sent back to the repo would reappear in other browsers under
+  // a different label and not show in the bookmarked view — which is the
+  // whole point of sending it. localStorage is the staging area; the
+  // published flag is where a bookmark actually becomes durable.
+  function isBookmarked(item) {
+    return prefs.bookmarked.indexOf(item.id) !== -1 || !!item.featured;
+  }
   function isMuted(item) { return prefs.mutedSources.indexOf(sourceOf(item)) !== -1; }
   function qualityKey(item) {
     if (prefs.demoted.indexOf(item.id) !== -1) return "low";
@@ -135,17 +144,24 @@
 
     var marked = isBookmarked(it);
     var badges = '<span class="badge quality-' + q + '">' + (QUALITY_LABELS[q] || "Unscored") + "</span>";
-    if (marked) badges += '<span class="badge bookmarked">★ bookmarked</span>';
-    if (it.featured) badges += '<span class="badge featured">featured</span>';
+    if (marked) {
+      badges += '<span class="badge bookmarked">★ bookmarked' + (it.featured ? " · saved" : "") + "</span>";
+    }
     if (isHidden(it)) badges += '<span class="badge suppressed">hidden</span>';
     else if (isMuted(it)) badges += '<span class="badge suppressed">source muted</span>';
 
     // Bookmarking stays available on a suppressed item: the sensible
     // recovery from "hid it, then realised I wanted it" shouldn't require
     // restoring it first.
-    var bookmarkBtn = '<button class="act' + (marked ? " on" : "") + '" data-act="bookmark" data-id="' + it.id +
-      '" title="' + (marked ? "Remove bookmark" : "Bookmark this item") + '">' +
-      (marked ? "★ bookmarked" : "☆ bookmark") + "</button>";
+    //
+    // A bookmark already applied upstream shows as a static marker rather
+    // than a toggle: un-bookmarking it is a repo change, so a button that
+    // appeared to toggle but couldn't would just mislead.
+    var bookmarkBtn = it.featured
+      ? '<span class="act published" title="Saved in the repo — visible in every browser. Remove via a corrections issue.">★ saved</span>'
+      : '<button class="act' + (marked ? " on" : "") + '" data-act="bookmark" data-id="' + it.id +
+        '" title="' + (marked ? "Remove bookmark" : "Bookmark this item") + '">' +
+        (marked ? "★ bookmarked" : "☆ bookmark") + "</button>";
 
     var actions = suppressed
       ? bookmarkBtn + '<button class="act" data-act="restore" data-id="' + it.id + '" title="Bring this back">restore</button>'
@@ -230,9 +246,12 @@
 
     var bookmarkToggle = document.getElementById("bookmarked-toggle");
     if (bookmarkToggle) {
-      bookmarkToggle.textContent = "★ Bookmarked (" + prefs.bookmarked.length + ")";
+      // Counts published bookmarks too, so the number matches what the
+      // bookmarked view actually shows.
+      var bookmarkTotal = allItems.filter(isBookmarked).length;
+      bookmarkToggle.textContent = "★ Bookmarked (" + bookmarkTotal + ")";
       bookmarkToggle.classList.toggle("active", state.bookmarkedOnly);
-      bookmarkToggle.hidden = prefs.bookmarked.length === 0 && !state.bookmarkedOnly;
+      bookmarkToggle.hidden = bookmarkTotal === 0 && !state.bookmarkedOnly;
     }
 
     var toggle = document.getElementById("show-hidden");
@@ -243,7 +262,11 @@
     }
     var sendBtn = document.getElementById("send-corrections");
     if (sendBtn) {
-      sendBtn.hidden = suppressedCount() === 0 && prefs.demoted.length === 0 && prefs.bookmarked.length === 0;
+      var unsent = prefs.bookmarked.filter(function (id) {
+        var it = allItems.filter(function (x) { return x.id === id; })[0];
+        return !it || !it.featured;
+      }).length;
+      sendBtn.hidden = suppressedCount() === 0 && prefs.demoted.length === 0 && unsent === 0;
     }
 
     var srcList = document.getElementById("source-list");
@@ -265,12 +288,18 @@
       }).join("\n");
     }
     var lines = ["Marks made while reading the " + slug + " page.", ""];
-    if (prefs.bookmarked.length) {
+    // Only bookmarks not already applied upstream — otherwise every export
+    // would re-send the whole accumulated list.
+    var unsentBookmarks = prefs.bookmarked.filter(function (id) {
+      var it = allItems.filter(function (x) { return x.id === id; })[0];
+      return !it || !it.featured;
+    });
+    if (unsentBookmarks.length) {
       // Bookmarks aren't a correction — they're Kevin's reading list — but
       // they ride along so they aren't stranded in one browser. Applied as
       // featured: true, which the site already renders.
-      lines.push("## Bookmarked — feature these (" + prefs.bookmarked.length + ")", "",
-        titlesFor(prefs.bookmarked), "");
+      lines.push("## Bookmarked — feature these (" + unsentBookmarks.length + ")", "",
+        titlesFor(unsentBookmarks), "");
     }
     if (prefs.hidden.length) {
       lines.push("## Reject these items (" + prefs.hidden.length + ")", "", titlesFor(prefs.hidden), "");
