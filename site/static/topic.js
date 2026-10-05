@@ -28,6 +28,9 @@
   var itemsUrl = app.getAttribute("data-items-url");
   var slug = app.getAttribute("data-slug") || "topic";
   var storageKey = "topic-monitor:" + slug;
+  var marksApi = (app.getAttribute("data-marks-api") || "").replace(/\/$/, "");
+  var keyStorageKey = "topic-monitor:write-key";
+  var syncState = "off"; // off | reading | synced | local | denied
 
   var allItems = [];
   var state = { q: "", quality: new Set(["high", "medium", "low", "unscored"]), view: "all", showHidden: false, bookmarkedOnly: false };
@@ -54,6 +57,88 @@
       prefs.quality = Array.from(state.quality);
       window.localStorage.setItem(storageKey, JSON.stringify(prefs));
     } catch (e) { /* storage unavailable — corrections stay for this page view only */ }
+    pushMarks();
+  }
+
+  // --- cross-browser sync (optional) ----------------------------------
+  // marks_api points at the Worker in worker/. When it isn't configured,
+  // or is unreachable, everything below no-ops and the page behaves
+  // exactly as it did before sync existed: marks stay browser-local.
+  function writeKey() {
+    try { return window.localStorage.getItem(keyStorageKey) || ""; } catch (e) { return ""; }
+  }
+
+  function setWriteKey(value) {
+    try {
+      if (value) window.localStorage.setItem(keyStorageKey, value);
+      else window.localStorage.removeItem(keyStorageKey);
+    } catch (e) { /* ignore */ }
+  }
+
+  function pullMarks() {
+    if (!marksApi) return Promise.resolve(false);
+    syncState = "reading";
+    return fetch(marksApi + "/marks/" + encodeURIComponent(slug), { cache: "no-store" })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (remote) {
+        if (!remote) { syncState = "local"; return false; }
+        // The store is the source of truth: adopt it wholesale rather than
+        // merging, so removing a bookmark in one browser doesn't get
+        // resurrected by another browser's stale copy.
+        prefs.bookmarked = remote.bookmarked || [];
+        prefs.hidden = remote.hidden || [];
+        prefs.demoted = remote.demoted || [];
+        prefs.mutedSources = remote.mutedSources || [];
+        try { window.localStorage.setItem(storageKey, JSON.stringify(prefs)); } catch (e) {}
+        syncState = "synced";
+        return true;
+      })
+      .catch(function () { syncState = "local"; return false; });
+  }
+
+  var pushTimer = null;
+  function pushMarks() {
+    if (!marksApi) return;
+    var key = writeKey();
+    if (!key) { syncState = "local"; renderSyncStatus(); return; }
+    // Coalesce rapid clicks into one write — KV's free tier allows 1,000
+    // writes a day, and a burst of bookmarking shouldn't spend them.
+    if (pushTimer) clearTimeout(pushTimer);
+    pushTimer = setTimeout(function () {
+      fetch(marksApi + "/marks/" + encodeURIComponent(slug), {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", "X-Marks-Key": key },
+        body: JSON.stringify({
+          bookmarked: prefs.bookmarked,
+          hidden: prefs.hidden,
+          demoted: prefs.demoted,
+          mutedSources: prefs.mutedSources,
+        }),
+      })
+        .then(function (r) { syncState = r.ok ? "synced" : (r.status === 401 ? "denied" : "local"); })
+        .catch(function () { syncState = "local"; })
+        .then(renderSyncStatus);
+    }, 600);
+  }
+
+  var SYNC_LABELS = {
+    off: "",
+    reading: "syncing…",
+    synced: "✓ synced across browsers",
+    local: "this browser only",
+    denied: "sync key rejected",
+  };
+
+  function renderSyncStatus() {
+    var el = document.getElementById("sync-status");
+    if (!el) return;
+    el.textContent = SYNC_LABELS[syncState] || "";
+    el.className = "muted sync-" + syncState;
+    var btn = document.getElementById("sync-connect");
+    if (btn) {
+      btn.hidden = !marksApi || syncState === "synced";
+      btn.textContent = syncState === "denied" ? "Fix sync key" : "Enable sync on this browser";
+    }
   }
 
   function toggleIn(list, value) {
@@ -362,6 +447,21 @@
       });
     }
 
+    var connectBtn = document.getElementById("sync-connect");
+    if (connectBtn) {
+      connectBtn.addEventListener("click", function () {
+        var entered = window.prompt(
+          "Paste the sync key to save marks across browsers.\n\n" +
+          "This is the WRITE_KEY from the marks Worker, not a GitHub token — " +
+          "it only grants access to this bookmark store. Leave blank to turn sync off here."
+        );
+        if (entered === null) return;      // cancelled
+        setWriteKey(entered.trim());
+        if (!entered.trim()) { syncState = "local"; renderSyncStatus(); return; }
+        pushMarks();
+      });
+    }
+
     var sendBtn = document.getElementById("send-corrections");
     if (sendBtn) {
       sendBtn.addEventListener("click", function () {
@@ -412,7 +512,15 @@
     .then(function (data) {
       allItems = data;
       wireControls();
-      render();
+      render();                 // paint immediately from the local copy
+      renderSyncStatus();
+      // ...then reconcile with the shared store, which may have marks made
+      // in another browser. Painting first means a slow or dead Worker
+      // never delays the page.
+      return pullMarks().then(function () {
+        render();
+        renderSyncStatus();
+      });
     })
     .catch(function () {
       // items.json fetch failed (e.g. the page was opened as a local

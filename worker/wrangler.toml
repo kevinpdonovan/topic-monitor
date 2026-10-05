@@ -1,0 +1,18 @@
+name = "topic-monitor-marks"
+main = "src/index.js"
+compatibility_date = "2026-10-05"
+
+# Origins allowed to call this Worker from a browser. The first entry is
+# the fallback used when the caller's Origin isn't on the list.
+[vars]
+ALLOWED_ORIGINS = "https://kevinpdonovan.github.io,http://localhost:8765,http://localhost:8766,http://localhost:8767,http://localhost:8768,http://localhost:8771"
+
+# KV namespace holding the marks. Create it once with:
+#   npx wrangler kv namespace create MARKS
+# then paste the printed id below.
+[[kv_namespaces]]
+binding = "MARKS"
+id = "REPLACE_WITH_KV_NAMESPACE_ID"
+
+# WRITE_KEY is a secret, never put it here. Set it with:
+#   npx wrangler secret put WRITE_KEY

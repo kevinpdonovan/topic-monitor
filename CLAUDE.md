@@ -392,6 +392,29 @@ clear, then decide whether to write," not "clear only when writing."
 
 ## Known limitations
 
+- **Unreviewed self-deposits were being rated high** (found 2026-10-05,
+  **addressed the same day** — kept here because the reasoning matters if
+  anyone is tempted to revisit the rubric). While checking whether the
+  anti-prestige instruction was doing real work — it is: 10 of 35 high
+  ratings went to venues with no prestige signal at all — the same
+  openness turned out to cut the other way. One author had six
+  self-published Zenodo deposits in a single review (a numbered
+  "Sovereign Digital Infrastructure Series"), four rated high. The scorer
+  sees a technically detailed abstract and credits it, with no
+  peer-review signal available to temper the judgment. Another Zenodo
+  record listed its authors as "Daniel Rosehill, Gemini 3.1 (Flash),
+  Chatterbox TTS" — AI models as co-authors.
+  Kevin's call was to add one sentence to the rubric rather than change
+  anything structural: an unreviewed self-deposit now needs stronger
+  evidence to reach "high", while a research-institute working paper or
+  well-evidenced preprint can still get there on substance. The sentence
+  says explicitly that this is about *whether the work has been checked
+  by anyone*, not the venue's status, and that it does not license
+  downrating unfamiliar or non-Anglophone venues — otherwise it would
+  quietly undo the heterodox instruction immediately above it. Watch the
+  next scored run: if high ratings for regional journals and Global South
+  institutions drop, the carve-out is leaking and should be narrowed.
+
 - `dedupe.py`'s `work_key()` can't version-merge items whose title is
   entirely non-Latin-script (Chinese, Japanese, Arabic, Cyrillic, ...) —
   `title_tokens()` uses an ASCII-only regex. Such items just don't get
@@ -549,15 +572,21 @@ script making assumptions.
     Closed both as duplicates of #1/#2 with an explanation. Fixed
     properly: the clear is now unconditional. Not yet pushed.
 12. ~~Push this commit~~ — done (`cd5f39b`).
-13. Still outstanding: confirm AI scoring produces real relevance/quality
-    scores on a run with actual new candidates — every run so far has
-    either hit a bug before reaching it, or found ~nothing new to score.
-    The next *real* monthly cycle (or a deliberate `--topic` test once
-    OpenAlex's rate limit from today's testing clears) will be the first
-    real confirmation. Worth being less trigger-happy with manual
-    `workflow_dispatch` runs going forward — each one hits live rate
-    limits for real and leaves evidence (duplicate issues, in this case)
-    if a bug's still lurking in the empty-candidates path.
+13. ~~Confirm AI scoring produces real relevance/quality scores~~ — **done,
+    2026-10-05, Harvest #5**: `ai_score ok=true, count=157`. Quality came
+    out 35 high / 83 medium / 39 low; relevance 65 at 3, 78 at 2, 13 at 1,
+    1 at 0. Literature reviews were held to the intended high bar (6 of
+    them: 1 high, 4 medium, 1 low). A venue cross-tab confirmed the rubric
+    is not simply tracking prestige — 10 of 35 high ratings went to bare
+    repository/preprint deposits (Zenodo, arXiv, SSRN, a Harvard Dataverse
+    replication dataset) and several to Lithuanian, Serbian, Venezuelan
+    and Spanish-language journals; only 2 of 35 were New Political
+    Economy. Same run also confirmed, all previously untested live: the
+    Google Alerts source resolving from its secret, `empty_ok` reporting a
+    quiet alert as healthy rather than failing, OpenAlex recovered from
+    the rate limit, and no duplicate issues (the unconditional review-dir
+    clear holds). GDELT 429'd for the fourth consecutive run, which now
+    looks permanent from Actions IPs rather than transient.
 14. Added `backfill.yml` + `python -m engine backfill` (same session): a
     one-time, manually-triggered, OpenAlex-only historical pull with the
     age-weighted citation pre-filter (see decisions table above). Not yet

@@ -1,0 +1,7 @@
+# Site-level settings, read at build time (engine/pipeline/build.py).
+
+# Base URL of the marks store Worker (see worker/README.md). Leave empty
+# to turn cross-browser sync off entirely — the site then falls back to
+# browser-local marks, which is exactly how it behaved before the Worker
+# existed, so an unset or broken value degrades rather than breaks.
+marks_api: ""

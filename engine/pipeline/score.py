@@ -110,6 +110,11 @@ QUALITY ("high", "medium", or "low") — judge substance, not prestige:
   rigor standard as anything else. A list of known-rigorous heterodox/Global South sources is provided below
   as context (not exhaustive, not gatekeeping) specifically to counter the tendency to under-rate unfamiliar
   venues relative to prestigious Global-North ones.
+- Treat an unreviewed self-deposit (a repository upload with no journal, press or institution behind it) as
+  needing stronger evidence to reach "high". A working paper from a research institute, or a well-evidenced
+  preprint, can still reach "high" on its substance; a self-published series should not by default. This is
+  about whether the work has been checked by anyone, NOT about the venue's status — it does not license
+  downrating unfamiliar or non-Anglophone venues, which the previous point forbids.
 
 Reply with ONLY a JSON array, one object per item, no prose:
 [{"id": "...", "relevance": 0, "quality": "high", "tags": ["..."], "reason": "one short sentence"}, ...]"""

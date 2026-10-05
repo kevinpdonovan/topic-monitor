@@ -70,6 +70,15 @@ ul.items li a.title:hover { text-decoration: underline; }
 .view-toggle button.active { color: var(--bg); background: var(--accent); border-color: var(--accent); }
 #result-count { margin: 0.6rem 0 0; }
 #controls .note { margin: 0.4rem 0 0; font-size: 0.8rem; opacity: 0.85; }
+#sync-status { font-weight: 600; margin-right: 0.3rem; }
+#sync-status.sync-synced { color: var(--ok); }
+#sync-status.sync-denied { color: var(--fail); }
+#sync-connect {
+  padding: 0.1rem 0.45rem; margin-right: 0.4rem; border: 1px solid var(--line);
+  border-radius: 4px; background: transparent; color: var(--muted);
+  font-size: 0.75rem; cursor: pointer;
+}
+#sync-connect:hover { color: var(--fg); border-color: var(--muted); }
 #send-corrections { color: var(--bg); background: var(--accent); border-color: var(--accent); font-weight: 600; }
 
 #source-panel { margin-top: 0.8rem; border-top: 1px solid var(--line); padding-top: 0.6rem; }

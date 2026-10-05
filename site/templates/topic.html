@@ -5,7 +5,7 @@
 <p class="muted">{{ topic.description }}</p>
 <p class="muted">{{ items|length }} accepted items &middot; cadence: {{ topic.cadence }}</p>
 
-<div id="app" data-items-url="items.json" data-slug="{{ topic.slug }}">
+<div id="app" data-items-url="items.json" data-slug="{{ topic.slug }}" data-marks-api="{{ marks_api }}">
   <div id="controls" hidden>
     <input id="search-input" type="search" placeholder="Search titles, authors, venues, tags…" aria-label="Search">
     <div class="quality-filter">
@@ -28,9 +28,11 @@
     </div>
     <p class="muted" id="result-count"></p>
     <p class="muted note">
-      Bookmarks, hiding, muting and low-quality marks are saved in this
-      browser only. Use <em>Send corrections</em> to push them back into the
-      pipeline so they stick everywhere, bookmarks included.
+      <span id="sync-status"></span>
+      <button type="button" id="sync-connect" hidden>Enable sync on this browser</button>
+      Marks sync across browsers when sync is on; otherwise they stay in this
+      browser. <em>Send corrections</em> pushes them into the pipeline itself,
+      which also stops muted sources being harvested again.
     </p>
   </div>
 

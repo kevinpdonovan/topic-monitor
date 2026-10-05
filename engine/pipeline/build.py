@@ -25,6 +25,17 @@ OUT_DIR = SITE_DIR / "_build"
 DATA_DIR = REPO_ROOT / "data"
 
 
+def _site_config() -> dict:
+    """Optional site/config.yaml. Absent or empty is fine — every consumer
+    treats a missing value as "feature off" rather than an error."""
+    import yaml
+
+    path = SITE_DIR / "config.yaml"
+    if not path.exists():
+        return {}
+    return yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+
+
 def _env(root: str = "") -> Environment:
     env = Environment(
         loader=FileSystemLoader(str(TEMPLATES_DIR)),
@@ -90,6 +101,7 @@ def build() -> dict:
         shutil.copytree(STATIC_DIR, OUT_DIR / "static")
 
     env = _env()
+    site_config = _site_config()
     corpus = Corpus(DATA_DIR / "items.jsonl")
     slugs = list_topics(status=None)  # include paused topics so old pages don't 404
     all_topics = []
@@ -126,6 +138,7 @@ def build() -> dict:
         (topic_dir / "items.json").write_text(_items_json(items), encoding="utf-8")
         (topic_dir / "index.html").write_text(
             topic_tmpl.render(
+                marks_api=site_config.get("marks_api", ""),
                 root="../",
                 all_topics=all_topics,
                 active_slug=slug,
