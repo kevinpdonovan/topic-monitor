@@ -45,9 +45,20 @@ def title_key(title: str) -> str:
 
 
 def surname(authors: list) -> str:
+    """Last name of the first author, used as the author half of work_key.
+
+    Trailing publication metadata is stripped first. Some records cram it
+    into the author field — found live 2026-10-05, where two copies of the
+    same Italian paper failed to merge because one listed the author as
+    "Giuseppe La Rosa" and the other as "Giuseppe La Rosa - Pubblicato in
+    Amministrativ@mente 3/2024", making the naive last-token surname
+    "3/2024". Only the separator-trailing junk is dropped, so this can
+    never merge two genuinely different authors; it just stops a malformed
+    field from splitting one.
+    """
     if not authors:
         return ""
-    first = authors[0].strip()
+    first = re.split(r"\s+[-–—]\s+|\s*\(", authors[0].strip())[0].strip()
     return first.split()[-1].lower() if first else ""
 
 

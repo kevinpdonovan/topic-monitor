@@ -13,6 +13,36 @@ def test_work_key_is_always_computable_for_titled_items():
     assert work_key(item)
 
 
+def test_surname_ignores_publication_metadata_in_the_author_field():
+    # Regression test for a real miss on the 2026-10-05 run: two copies of
+    # the same paper didn't merge because one record's author field carried
+    # trailing publication metadata, so the naive last-token surname came
+    # out as "3/2024" instead of "rosa".
+    from engine.pipeline.dedupe import surname
+
+    assert surname(["Giuseppe La Rosa"]) == "rosa"
+    assert surname(["Giuseppe La Rosa - Pubblicato in Amministrativ@mente 3/2024"]) == "rosa"
+    assert surname(["Jane Smith (University of Edinburgh)"]) == "smith"
+    # ...and it must not conflate genuinely different authors
+    assert surname(["Jane Smith"]) != surname(["Jane Patel"])
+
+
+def test_malformed_author_field_no_longer_blocks_a_merge():
+    clean = make_item(
+        title="I pagamenti dalla e alla P.A. in Euro Digitale",
+        source_type="article", connector="openalex", url="https://a.example/1",
+        authors=["Giuseppe La Rosa"],
+    )
+    messy = make_item(
+        title="I pagamenti dalla e alla P.A. in Euro Digitale",
+        source_type="article", connector="openalex", url="https://b.example/2",
+        authors=["Giuseppe La Rosa - Pubblicato in Amministrativ@mente 3/2024"],
+    )
+    kept, merged_count = merge_versions([clean, messy])
+    assert merged_count == 1
+    assert len(kept) == 1
+
+
 def test_merge_versions_does_not_crash_on_a_non_latin_title():
     # Regression test for a real failure on the first live harvest run
     # (2026-10-03): a Chinese-language e-CNY paper's title tokenizes to
