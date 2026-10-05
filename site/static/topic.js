@@ -30,8 +30,8 @@
   var storageKey = "topic-monitor:" + slug;
 
   var allItems = [];
-  var state = { q: "", quality: new Set(["high", "medium", "low", "unscored"]), view: "all", showHidden: false };
-  var prefs = { hidden: [], demoted: [], mutedSources: [], quality: null };
+  var state = { q: "", quality: new Set(["high", "medium", "low", "unscored"]), view: "all", showHidden: false, bookmarkedOnly: false };
+  var prefs = { hidden: [], demoted: [], mutedSources: [], bookmarked: [], quality: null };
 
   // --- storage -------------------------------------------------------
   // localStorage throws outright in some privacy modes, so every access is
@@ -43,6 +43,7 @@
       var parsed = JSON.parse(raw);
       prefs.hidden = parsed.hidden || [];
       prefs.demoted = parsed.demoted || [];
+      prefs.bookmarked = parsed.bookmarked || [];
       prefs.mutedSources = parsed.mutedSources || [];
       prefs.quality = parsed.quality || null;
     } catch (e) { /* no stored prefs, carry on with defaults */ }
@@ -64,6 +65,7 @@
   // --- item helpers --------------------------------------------------
   function sourceOf(item) { return item.venue || item.organisation || "(no source)"; }
   function isHidden(item) { return prefs.hidden.indexOf(item.id) !== -1; }
+  function isBookmarked(item) { return prefs.bookmarked.indexOf(item.id) !== -1; }
   function isMuted(item) { return prefs.mutedSources.indexOf(sourceOf(item)) !== -1; }
   function qualityKey(item) {
     if (prefs.demoted.indexOf(item.id) !== -1) return "low";
@@ -93,6 +95,15 @@
   }
 
   function visibleItems() {
+    // In bookmarked view, show exactly the bookmarks (search still applies).
+    // Deliberately not intersected with the quality filter or suppression:
+    // a bookmark is an explicit "keep this", and having one silently vanish
+    // because a quality checkbox is unticked elsewhere would be baffling.
+    if (state.bookmarkedOnly) {
+      return allItems.filter(function (it) {
+        return isBookmarked(it) && matchesSearch(it, state.q);
+      });
+    }
     return allItems.filter(function (it) {
       var suppressed = isHidden(it) || isMuted(it);
       if (suppressed && !state.showHidden) return false;
@@ -122,14 +133,24 @@
     var q = qualityKey(it);
     var suppressed = isHidden(it) || isMuted(it);
 
+    var marked = isBookmarked(it);
     var badges = '<span class="badge quality-' + q + '">' + (QUALITY_LABELS[q] || "Unscored") + "</span>";
+    if (marked) badges += '<span class="badge bookmarked">★ bookmarked</span>';
     if (it.featured) badges += '<span class="badge featured">featured</span>';
     if (isHidden(it)) badges += '<span class="badge suppressed">hidden</span>';
     else if (isMuted(it)) badges += '<span class="badge suppressed">source muted</span>';
 
+    // Bookmarking stays available on a suppressed item: the sensible
+    // recovery from "hid it, then realised I wanted it" shouldn't require
+    // restoring it first.
+    var bookmarkBtn = '<button class="act' + (marked ? " on" : "") + '" data-act="bookmark" data-id="' + it.id +
+      '" title="' + (marked ? "Remove bookmark" : "Bookmark this item") + '">' +
+      (marked ? "★ bookmarked" : "☆ bookmark") + "</button>";
+
     var actions = suppressed
-      ? '<button class="act" data-act="restore" data-id="' + it.id + '" title="Bring this back">restore</button>'
-      : '<button class="act" data-act="hide" data-id="' + it.id + '" title="Hide this item">hide</button>' +
+      ? bookmarkBtn + '<button class="act" data-act="restore" data-id="' + it.id + '" title="Bring this back">restore</button>'
+      : bookmarkBtn +
+        '<button class="act" data-act="hide" data-id="' + it.id + '" title="Hide this item">hide</button>' +
         (q === "low"
           ? '<button class="act" data-act="undemote" data-id="' + it.id + '" title="Undo low-quality mark">unmark low</button>'
           : '<button class="act" data-act="demote" data-id="' + it.id + '" title="Mark as low quality">mark low</button>') +
@@ -202,17 +223,28 @@
     var countEl = document.getElementById("result-count");
     if (countEl) {
       var n = suppressedCount();
-      countEl.textContent = items.length + " of " + allItems.length + " items" +
-        (n ? " · " + n + " suppressed" : "");
+      countEl.textContent = state.bookmarkedOnly
+        ? items.length + " bookmarked item" + (items.length === 1 ? "" : "s")
+        : items.length + " of " + allItems.length + " items" + (n ? " · " + n + " suppressed" : "");
+    }
+
+    var bookmarkToggle = document.getElementById("bookmarked-toggle");
+    if (bookmarkToggle) {
+      bookmarkToggle.textContent = "★ Bookmarked (" + prefs.bookmarked.length + ")";
+      bookmarkToggle.classList.toggle("active", state.bookmarkedOnly);
+      bookmarkToggle.hidden = prefs.bookmarked.length === 0 && !state.bookmarkedOnly;
     }
 
     var toggle = document.getElementById("show-hidden");
     if (toggle) {
       toggle.textContent = state.showHidden ? "Hide suppressed" : "Show suppressed (" + suppressedCount() + ")";
-      toggle.hidden = suppressedCount() === 0;
+      // Suppression is meaningless in the bookmarked view, which ignores it.
+      toggle.hidden = suppressedCount() === 0 || state.bookmarkedOnly;
     }
     var sendBtn = document.getElementById("send-corrections");
-    if (sendBtn) sendBtn.hidden = suppressedCount() === 0 && prefs.demoted.length === 0;
+    if (sendBtn) {
+      sendBtn.hidden = suppressedCount() === 0 && prefs.demoted.length === 0 && prefs.bookmarked.length === 0;
+    }
 
     var srcList = document.getElementById("source-list");
     if (srcList) srcList.innerHTML = renderSourceFilter();
@@ -232,7 +264,14 @@
         return "- `" + id + "` — " + (it ? it.title : "(not in current list)");
       }).join("\n");
     }
-    var lines = ["Corrections made while reading the " + slug + " page.", ""];
+    var lines = ["Marks made while reading the " + slug + " page.", ""];
+    if (prefs.bookmarked.length) {
+      // Bookmarks aren't a correction — they're Kevin's reading list — but
+      // they ride along so they aren't stranded in one browser. Applied as
+      // featured: true, which the site already renders.
+      lines.push("## Bookmarked — feature these (" + prefs.bookmarked.length + ")", "",
+        titlesFor(prefs.bookmarked), "");
+    }
     if (prefs.hidden.length) {
       lines.push("## Reject these items (" + prefs.hidden.length + ")", "", titlesFor(prefs.hidden), "");
     }
@@ -248,7 +287,7 @@
     }
     lines.push("---", "Sent from the site. Apply per CLAUDE.md, \"Applying corrections from the site\".");
     return "https://github.com/" + REPO + "/issues/new" +
-      "?title=" + encodeURIComponent("Corrections: " + slug) +
+      "?title=" + encodeURIComponent("Marks from the site: " + slug) +
       "&body=" + encodeURIComponent(lines.join("\n")) +
       "&labels=" + encodeURIComponent("corrections");
   }
@@ -286,6 +325,14 @@
       showHidden.addEventListener("click", function () { state.showHidden = !state.showHidden; render(); });
     }
 
+    var bookmarkToggle = document.getElementById("bookmarked-toggle");
+    if (bookmarkToggle) {
+      bookmarkToggle.addEventListener("click", function () {
+        state.bookmarkedOnly = !state.bookmarkedOnly;
+        render();
+      });
+    }
+
     var sendBtn = document.getElementById("send-corrections");
     if (sendBtn) {
       sendBtn.addEventListener("click", function () {
@@ -309,7 +356,8 @@
       var id = btn.getAttribute("data-id");
       var source = btn.getAttribute("data-source");
 
-      if (act === "hide") toggleIn(prefs.hidden, id);
+      if (act === "bookmark") toggleIn(prefs.bookmarked, id);
+      else if (act === "hide") toggleIn(prefs.hidden, id);
       else if (act === "demote") toggleIn(prefs.demoted, id);
       else if (act === "undemote") toggleIn(prefs.demoted, id);
       else if (act === "mute" || act === "unmute") toggleIn(prefs.mutedSources, source);

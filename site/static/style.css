@@ -91,7 +91,10 @@ button.act {
   background: transparent; color: var(--muted); font-size: 0.75rem; cursor: pointer;
 }
 button.act:hover { color: var(--fg); border-color: var(--muted); }
+button.act.on { color: var(--accent); border-color: var(--accent); font-weight: 600; }
 .badge.suppressed { color: var(--fail); border-color: var(--fail); }
+.badge.bookmarked { color: var(--accent); border-color: var(--accent); }
+#bookmarked-toggle.active { color: var(--bg); background: var(--accent); border-color: var(--accent); }
 table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
 th, td { text-align: left; padding: 0.4rem 0.6rem; border-bottom: 1px solid var(--line); font-size: 0.9rem; }
 th { color: var(--muted); font-weight: 600; }

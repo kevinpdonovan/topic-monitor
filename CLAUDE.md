@@ -416,8 +416,15 @@ clear, then decide whether to write," not "clear only when writing."
 
 ## Applying corrections from the site
 
-Each topic page has per-item `hide` / `mark low` / `mute source` controls
-and a source list with mute toggles. **Those are browser-local only** —
+Each topic page has per-item `bookmark` / `hide` / `mark low` /
+`mute source` controls, a source list with mute toggles, and a
+"★ Bookmarked (N)" view that filters to bookmarks only — which composes
+with the existing All time / By month toggle, so bookmarks can be read
+either way without a separate page. The bookmarked view deliberately
+ignores the quality filter and suppression: a bookmark is an explicit
+"keep this", and having one vanish because a quality checkbox was
+unticked elsewhere would be baffling. **Those marks are browser-local
+only** —
 they're stored in `localStorage` under `topic-monitor:<slug>`, so they
 take effect instantly and survive reloads, but they live in one browser,
 teach the pipeline nothing, and vanish if site data is cleared. The page
@@ -427,6 +434,12 @@ The **"Send corrections →"** button turns them into a pre-filled GitHub
 issue labeled `corrections`, listing item ids + titles and muted source
 names. When one of those arrives, apply it properly:
 
+- **Bookmarked — feature these** → set `featured: true` on that id's
+  decision record. Bookmarks aren't corrections (they're Kevin's reading
+  list) but they ride along in the same export so they aren't stranded in
+  one browser; `featured` is the existing field that already renders a
+  badge site-wide, so it's the natural home rather than a parallel
+  mechanism.
 - **Reject these items** → record each id as `rejected` in
   `data/decisions/<slug>.jsonl` (`DecisionStore.record`). This both drops
   them from the site and stops them ever being offered again, since
